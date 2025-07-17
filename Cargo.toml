@@ -1,0 +1,26 @@
+[package]
+name = "subbers"
+description = "Manage your sports game subs"
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/karlskewes/subbers"
+keywords = ["sports"]
+categories = ["games"]
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8.4"
+chrono = { version = "0.4.41", features = ["serde"] }
+clap = { version = "4.5.42", features = ["derive"] }
+http-body-util = "0.1.3"
+maud = { version = "0.27.0", features = [] }
+mime = "0.3.17"
+rusqlite = { version = "0.36.0", features = ["bundled"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+tokio = { version = "1.45.0", features = ["rt", "rt-multi-thread", "signal"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.6", features = ["fs"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
