@@ -27,7 +27,7 @@ const LISTEN_ADDR: &str = "0.0.0.0:8080";
 struct CLIArgs {
     /// SQLite file path
     #[arg(short, long, default_value = SQLITE_FILEPATH)]
-    sqlite_filepath: String,
+    sqlite_filepath: Option<std::path::PathBuf>,
 
     /// Listen Address for HTTP server
     #[arg(short, long, default_value = LISTEN_ADDR)]
@@ -35,13 +35,13 @@ struct CLIArgs {
 }
 
 pub enum RepoConfig {
-    Sqlite(Option<String>),
+    Sqlite(Option<std::path::PathBuf>),
     InMemory,
 }
 
 impl Default for RepoConfig {
     fn default() -> Self {
-        Self::Sqlite(Some(String::from(SQLITE_FILEPATH)))
+        Self::Sqlite(Some(std::path::PathBuf::from(SQLITE_FILEPATH)))
     }
 }
 
@@ -66,9 +66,7 @@ impl Config {
         let args = CLIArgs::try_parse_from(args)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
 
-        if !args.sqlite_filepath.is_empty() {
-            cfg.repo_config = RepoConfig::Sqlite(Some(args.sqlite_filepath));
-        }
+        cfg.repo_config = RepoConfig::Sqlite(args.sqlite_filepath);
 
         if !args.listen_addr.is_empty() {
             cfg.listen_addr = args.listen_addr;

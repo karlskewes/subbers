@@ -122,7 +122,7 @@ impl SqliteRepo {
     #[must_use]
     /// `new` constructs a sqlite repo for persisting game and player data. If a file exists at the
     /// provided `path` then it is used, otherwise a new file is created.
-    pub fn new(path: Option<String>) -> Result<Self, Error> {
+    pub fn new(path: Option<std::path::PathBuf>) -> Result<Self, Error> {
         let conn = path.map_or_else(|| Connection::open_in_memory(), |p| Connection::open(p))?;
 
         conn.execute_batch(

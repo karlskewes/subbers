@@ -9,9 +9,6 @@ target/
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-# default config, see ./config_example.json
-config.json
-
 # database
 subbers.sql
 
