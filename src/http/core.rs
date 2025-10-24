@@ -83,6 +83,7 @@ impl AxumApp {
             .route("/players/{player_id}/edit", get(edit_player_form))
             // state
             .with_state(state)
+            .route("/ready", get(ready))
     }
 }
 
@@ -95,6 +96,10 @@ struct AppState {
 struct NewPlayerForm {
     pub name: String,
     pub number: u32,
+}
+
+async fn ready() -> impl IntoResponse {
+    StatusCode::OK
 }
 
 async fn home(State(state): State<AppState>) -> Result<impl IntoResponse, Error> {
