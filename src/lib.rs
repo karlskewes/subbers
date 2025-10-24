@@ -97,7 +97,11 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
     let svc = Service::new(repo);
     let app = AxumApp::new(cfg.listen_addr, svc);
 
-    app.run(shutdown_signal()).await
+    tracing::info!(message = "starting server");
+    app.run(shutdown_signal()).await?;
+
+    tracing::info!(message = "shutting down");
+    Ok(())
 }
 
 // TODO: Should this live in AxumApp?

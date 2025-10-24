@@ -45,7 +45,7 @@ impl AxumApp {
         F: Future<Output = ()> + Send + 'static,
     {
         let listener = tokio::net::TcpListener::bind(&self.listen_addr).await?;
-        tracing::info!("listening on {}", listener.local_addr()?);
+        tracing::info!("listening on http://{}", listener.local_addr()?);
 
         axum::serve(listener, self.into_router())
             .with_graceful_shutdown(shutdown_signal)
