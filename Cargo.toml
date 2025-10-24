@@ -9,6 +9,9 @@ categories = ["games"]
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "subbers"
+
 [dependencies]
 axum = "0.8.4"
 chrono = { version = "0.4.41", features = ["serde"] }
