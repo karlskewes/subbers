@@ -28,6 +28,7 @@ Usage: subbers [OPTIONS]
 Options:
   -s, --sqlite-filepath <SQLITE_FILEPATH>  SQLite file path [default: subbers.sql]
   -l, --listen-addr <LISTEN_ADDR>          Listen Address for HTTP server [default: 0.0.0.0:8080]
+  -b, --basic-auth <BASIC_AUTH>            Basic Auth 'user:pass' for HTTP server
   -h, --help                               Print help
   -V, --version                            Print version
 ```

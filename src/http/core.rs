@@ -4,14 +4,16 @@ use super::{games_templates, layout_templates, players_templates};
 use crate::{Error, GameView, Service, into_game_views, into_player_views};
 use axum::{
     Router,
-    extract::{Form, Path, State},
-    http::header::HeaderMap,
-    http::{StatusCode, header},
+    extract::{Form, FromRequestParts, Path, State},
+    http::{StatusCode, header, request::Parts},
+    middleware::{self},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
+use base64::prelude::*;
 use maud::Markup;
 use serde::Deserialize;
+use std::sync::Arc;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -28,16 +30,43 @@ impl IntoResponse for Error {
     }
 }
 
+#[derive(Clone)]
+struct AuthConfig {
+    basic_auth: Option<User>, // could make hashmap with a User struct, name/pass/role.
+}
+
+impl AuthConfig {
+    fn new(basic_auth: Option<User>) -> Self {
+        Self { basic_auth }
+    }
+
+    // validate checks the provided AUTHORIZATION header value matches any configured auth values.
+    fn validate(&self, user: Option<User>) -> bool {
+        match (&self.basic_auth, user) {
+            (None, _) => true,
+            (Some(_), None) => false,
+            (Some(want), Some(got)) => {
+                want.username == got.username && want.password == got.password
+            }
+        }
+    }
+}
+
 pub struct AxumApp {
     // tracing, etc
+    basic_auth: Option<User>,
     listen_addr: String,
     svc: Service,
 }
 
 impl AxumApp {
     #[must_use]
-    pub const fn new(listen_addr: String, svc: Service) -> Self {
-        Self { listen_addr, svc }
+    pub fn new(listen_addr: String, basic_auth: Option<User>, svc: Service) -> Self {
+        Self {
+            listen_addr,
+            basic_auth,
+            svc,
+        }
     }
 
     pub async fn run<F>(self: AxumApp, shutdown_signal: F) -> Result<(), std::io::Error>
@@ -54,6 +83,8 @@ impl AxumApp {
 
     pub fn into_router(self) -> Router {
         let state = AppState { svc: self.svc };
+
+        let auth_config = Arc::new(AuthConfig::new(self.basic_auth));
 
         Router::new()
             .route("/", get(home))
@@ -81,8 +112,13 @@ impl AxumApp {
                 get(get_player).put(edit_player).delete(delete_player),
             )
             .route("/players/{player_id}/edit", get(edit_player_form))
-            // state
-            .with_state(state)
+            // basic auth required for above route(s)
+            .route_layer(middleware::from_extractor_with_state::<RequireAuth, _>(
+                auth_config.clone(),
+            ))
+            // state (db, etc)
+            .with_state(state.clone())
+            // basic auth not required for below routes
             .route("/ready", get(ready))
     }
 }
@@ -96,6 +132,57 @@ struct AppState {
 struct NewPlayerForm {
     pub name: String,
     pub number: u32,
+}
+
+#[derive(Clone)]
+pub struct User {
+    pub username: String,
+    pub password: String,
+}
+
+// RequireAuth implements the Axum Extractor to perform authorization.
+#[derive(Clone)]
+struct RequireAuth {}
+
+fn decode_basic_auth(header_value: String) -> Option<User> {
+    let b64 = header_value.strip_prefix("Basic ")?;
+    let decoded = BASE64_STANDARD.decode(b64).ok()?;
+    let userpass = String::from_utf8(decoded).ok()?;
+    let (username, password) = userpass.split_once(':')?;
+
+    Some(User {
+        username: username.to_string(),
+        password: password.to_string(),
+    })
+}
+
+impl FromRequestParts<Arc<AuthConfig>> for RequireAuth {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        auth_config: &Arc<AuthConfig>,
+    ) -> Result<Self, Self::Rejection> {
+        let user = parts
+            .headers
+            .get(header::AUTHORIZATION) // typically only specified once, ignore rest.
+            .and_then(|hv| hv.to_str().ok())
+            .and_then(|hv| decode_basic_auth(hv.to_string()));
+
+        // TODO: consider passing parts.uri & parts.method if add roles (admin, viewer).
+        if auth_config.validate(user) {
+            return Ok(Self {});
+        }
+
+        Err((
+            StatusCode::UNAUTHORIZED,
+            [(
+                header::WWW_AUTHENTICATE,
+                "Basic realm=\"Credentials required\"",
+            )],
+        )
+            .into_response())
+    }
 }
 
 async fn ready() -> impl IntoResponse {
@@ -248,7 +335,7 @@ fn get_game_html(game: GameView) -> Markup {
 async fn get_game(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
-    headers: HeaderMap,
+    headers: header::HeaderMap,
 ) -> Result<impl IntoResponse, Error> {
     let game_id: u32 = game_id
         .trim()
@@ -425,7 +512,7 @@ mod tests {
         let cfg = Config::default();
         let repo = Arc::new(InMemoryRepo::new());
         let svc = Service::new(repo);
-        let app = AxumApp::new(cfg.listen_addr, svc).into_router();
+        let app = AxumApp::new(cfg.listen_addr, None, svc).into_router();
 
         let response = app
             .oneshot(
@@ -445,7 +532,7 @@ mod tests {
         let cfg = Config::default();
         let repo = Arc::new(InMemoryRepo::new());
         let svc = Service::new(repo);
-        let app = AxumApp::new(cfg.listen_addr, svc).into_router();
+        let app = AxumApp::new(cfg.listen_addr, None, svc).into_router();
 
         let response = app
             .oneshot(

@@ -4,4 +4,4 @@ mod icon_templates;
 mod layout_templates;
 mod players_templates;
 
-pub use core::AxumApp;
+pub use core::{AxumApp, User};

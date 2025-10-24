@@ -9,7 +9,7 @@ pub use self::error::Error;
 pub use self::game::GameView;
 pub use self::game::{Event, EventError};
 pub use self::game::{Game, GameState, into_game_views};
-pub use self::http::AxumApp;
+pub use self::http::{AxumApp, User};
 pub use self::player::{Player, PlayerView, into_player_views};
 pub use self::repo::{InMemoryRepo, Repo, SqliteRepo};
 pub use self::svc::Service;
@@ -32,6 +32,10 @@ struct CLIArgs {
     /// Listen Address for HTTP server
     #[arg(short, long, default_value = LISTEN_ADDR)]
     listen_addr: String,
+
+    /// Basic Auth 'user:pass' for HTTP server
+    #[arg(short, long)]
+    basic_auth: Option<String>,
 }
 
 pub enum RepoConfig {
@@ -48,6 +52,7 @@ impl Default for RepoConfig {
 pub struct Config {
     repo_config: RepoConfig,
     listen_addr: String,
+    basic_auth: Option<User>,
 }
 
 impl Default for Config {
@@ -55,6 +60,7 @@ impl Default for Config {
         Self {
             listen_addr: String::from(LISTEN_ADDR),
             repo_config: RepoConfig::default(),
+            basic_auth: None,
         }
     }
 }
@@ -71,6 +77,38 @@ impl Config {
         if !args.listen_addr.is_empty() {
             cfg.listen_addr = args.listen_addr;
         }
+
+        cfg.basic_auth = args
+            .basic_auth
+            .as_ref()
+            .map(|ba| {
+                ba.split_once(':')
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "basic auth must be in the form 'user:pass'",
+                        )
+                    })
+                    .and_then(|(username, password)| {
+                        if username.is_empty() {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "basic auth username cannot be empty",
+                            ))
+                        } else if password.is_empty() {
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "basic auth password cannot be empty",
+                            ))
+                        } else {
+                            Ok(User {
+                                username: username.to_string(),
+                                password: password.to_string(),
+                            })
+                        }
+                    })
+            })
+            .transpose()?;
 
         return Ok(cfg);
     }
@@ -95,7 +133,7 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
         }
     };
     let svc = Service::new(repo);
-    let app = AxumApp::new(cfg.listen_addr, svc);
+    let app = AxumApp::new(cfg.listen_addr, cfg.basic_auth, svc);
 
     tracing::info!(message = "starting server");
     app.run(shutdown_signal()).await?;
