@@ -51,10 +51,10 @@ impl GameView {
     }
 
     pub fn current_period_duration(&self) -> String {
-        if let Some(p) = self.periods.last() {
-            if p.end_time.is_none() {
-                return duration(Utc::now() - p.start_time);
-            }
+        if let Some(p) = self.periods.last()
+            && p.end_time.is_none()
+        {
+            return duration(Utc::now() - p.start_time);
         }
 
         "-".to_string()
