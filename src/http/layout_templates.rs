@@ -2,8 +2,7 @@ use maud::{DOCTYPE, Markup, html};
 
 fn header(title: &str, description: &str) -> Markup {
     html! {
-        meta charset="utf-8"
-        head {
+        meta charset="utf-8" head {
             title { (title) }
             link rel="stylesheet" href="/static/beer_3.11.33.min.css";
             link rel="stylesheet" href="/static/theme.css";
@@ -15,29 +14,31 @@ fn header(title: &str, description: &str) -> Markup {
             meta name="description" content=(description);
             meta http-equiv="X-UA-Compatible" content="ie=edge";
             meta http-equiv="Content-Type" content="text/html; charset=utf-8";
-            script src="/static/htmx_2.0.4.js" {};
-            script type="module" src="/static/beer_3.11.33.min.js" {};
+            script src="/static/htmx_2.0.4.js" {}
+            ;
+            script type="module" src="/static/beer_3.11.33.min.js" {}
+            ;
         }
     }
 }
 
 fn footer() -> Markup {
     html! {
-        footer {
-        }
+        footer {}
     }
 }
 
 pub fn body(contents: &Markup) -> Markup {
     html! {
-        body class="light" { // TODO: use OS/browser default mode light/dark.
+        body class="light" {  // TODO: use OS/browser default mode light/dark.
             header class="responsive" {
                 nav {
-                    a class="max center-align" href="/" { h6 { "subbers" } }
+                    a class="max center-align" href="/" {
+                        h6 { "subbers" }
+                    }
                 }
                 hr;
             }
-
             main class="responsive" { (contents) }
         }
     }
