@@ -45,7 +45,7 @@ impl Player {
         }
 
         if let Some(st) = self.play_start_time {
-            self.play_duration = self.play_duration + (Utc::now() - st);
+            self.play_duration += Utc::now() - st;
         }
 
         self.play_start_time = None;

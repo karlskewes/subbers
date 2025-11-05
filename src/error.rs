@@ -33,7 +33,7 @@ impl From<Error> for std::io::Error {
                 std::io::Error::new(std::io::ErrorKind::NotFound, "resource not found")
             }
             Error::InvalidInput(msg) => std::io::Error::new(std::io::ErrorKind::InvalidInput, msg),
-            Error::Internal(msg) => std::io::Error::new(std::io::ErrorKind::Other, msg),
+            Error::Internal(msg) => std::io::Error::other(msg),
         }
     }
 }

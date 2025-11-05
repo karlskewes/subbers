@@ -4,12 +4,11 @@ use super::state::GameState;
 use crate::player::{PlayerView, into_player_views};
 use chrono::{DateTime, TimeDelta, Utc};
 
-const TIME_FORMAT_DIGITAL: &'static str = "%H:%M:%S";
+const TIME_FORMAT_DIGITAL: &str = "%H:%M:%S";
 
 fn digital_time(date: Option<DateTime<Utc>>) -> String {
-    return date
-        .map(|d| format!("{}", d.format(TIME_FORMAT_DIGITAL)))
-        .unwrap_or_else(|| "-".to_string());
+    date.map(|d| format!("{}", d.format(TIME_FORMAT_DIGITAL)))
+        .unwrap_or_else(|| "-".to_string())
 }
 
 fn duration(delta: TimeDelta) -> String {
@@ -84,7 +83,7 @@ impl From<&Game> for GameView {
             super::state::State::Finished(p) => (Some(p.state.start_time), Some(p.state.end_time)),
         };
 
-        return Self {
+        Self {
             id: game.id,
             start_time,
             end_time,
@@ -92,6 +91,6 @@ impl From<&Game> for GameView {
             players: into_player_views(game.shared.players.clone()),
             state: game.state.kind(),
             mvp: game.shared.mvp,
-        };
+        }
     }
 }

@@ -110,7 +110,7 @@ impl Config {
             })
             .transpose()?;
 
-        return Ok(cfg);
+        Ok(cfg)
     }
 }
 

@@ -91,7 +91,7 @@ impl From<PlayerSqlRow> for Player {
             play_count: row.play_count,
             play_start_time: row
                 .play_start_time
-                .map_or_else(|| None, |ts| chrono::DateTime::from_timestamp_millis(ts)),
+                .map_or_else(|| None, chrono::DateTime::from_timestamp_millis),
             play_duration: pd,
         }
     }
@@ -113,17 +113,16 @@ impl From<Player> for PlayerSqlRow {
 
 /// `SqliteRepo` provides a sqlite `Repo` implementation.
 impl SqliteRepo {
-    fn get_conn(&self) -> Result<MutexGuard<Connection>, Error> {
+    fn get_conn(&self) -> Result<MutexGuard<'_, Connection>, Error> {
         self.conn
             .lock()
             .map_err(|_| Error::Internal("Failed to acquire lock on SQL connection".to_string()))
     }
 
-    #[must_use]
     /// `new` constructs a sqlite repo for persisting game and player data. If a file exists at the
     /// provided `path` then it is used, otherwise a new file is created.
     pub fn new(path: Option<std::path::PathBuf>) -> Result<Self, Error> {
-        let conn = path.map_or_else(|| Connection::open_in_memory(), |p| Connection::open(p))?;
+        let conn = path.map_or_else(Connection::open_in_memory, Connection::open)?;
 
         conn.execute_batch(
             "

@@ -152,7 +152,7 @@ impl Service {
             .players
             .iter_mut()
             .find(|p| &p.id == player_id)
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or(Error::NotFound)?;
 
         player.sub_on();
         self.repo.update_game(game.clone())?;
@@ -167,7 +167,7 @@ impl Service {
             .players
             .iter_mut()
             .find(|p| &p.id == player_id)
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or(Error::NotFound)?;
 
         player.sub_off();
         self.repo.update_game(game.clone())?;
@@ -181,9 +181,9 @@ impl Service {
             .players
             .iter()
             .find(|p| &p.id == player_id)
-            .ok_or_else(|| Error::NotFound)?;
+            .ok_or(Error::NotFound)?;
 
-        game.shared.mvp = Some(player_id.clone());
+        game.shared.mvp = Some(*player_id);
         self.repo.update_game(game.clone())?;
 
         Ok(game)

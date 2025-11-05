@@ -144,6 +144,8 @@ pub struct User {
 #[derive(Clone)]
 struct RequireAuth {}
 
+// decode_basic_auth will attempt to decode the 'user:pass' and if any errors are present will
+// silently return None. TODO: Consider returning HTTP BAD_REQUEST 400's.
 fn decode_basic_auth(header_value: String) -> Option<User> {
     let b64 = header_value.strip_prefix("Basic ")?;
     let decoded = BASE64_STANDARD.decode(b64).ok()?;
@@ -167,7 +169,8 @@ impl FromRequestParts<Arc<AuthConfig>> for RequireAuth {
             .headers
             .get(header::AUTHORIZATION) // typically only specified once, ignore rest.
             .and_then(|hv| hv.to_str().ok())
-            .and_then(|hv| decode_basic_auth(hv.to_string()));
+            .and_then(|hv| decode_basic_auth(hv.to_string())); // TODO: handle error 400 instead of
+        // just returning None.
 
         // TODO: consider passing parts.uri & parts.method if add roles (admin, viewer).
         if auth_config.validate(user) {
@@ -344,16 +347,16 @@ async fn get_game(
 
     let game: GameView = state.svc.get_game(&game_id)?.into();
     let contents = get_game_html(game);
-    let body: String;
 
-    if headers.contains_key("HX-Request") {
+    let body = if headers.contains_key("HX-Request") {
         // body will be injected into an existing page.
-        body = contents.into_string();
+        contents.into_string()
     } else {
         let title = format!("Game {}", &game_id);
         let description = format!("Game {}", &game_id);
-        body = layout_templates::page(&title, &description, &contents).into_string();
-    }
+
+        layout_templates::page(&title, &description, &contents).into_string()
+    };
 
     Ok((StatusCode::OK, Html(body)))
 }
@@ -461,7 +464,7 @@ async fn sub_player_on(
         .ok_or_else(|| Error::Internal("player not found".to_string()))?;
 
     let body = Html(
-        players_templates::player_actions_table_row(&game.id, &game.state, &player).into_string(),
+        players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),
     );
 
     Ok((StatusCode::OK, body))
@@ -489,7 +492,7 @@ async fn sub_player_off(
         .ok_or_else(|| Error::Internal("player not found".to_string()))?;
 
     let body = Html(
-        players_templates::player_actions_table_row(&game.id, &game.state, &player).into_string(),
+        players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),
     );
 
     Ok((StatusCode::OK, body))
@@ -556,7 +559,7 @@ mod tests {
 
         assert_eq!(
             body,
-            "<tr><td>1</td><td>foo</td><td>0</td><td>0m 0s</td><td>-</td></tr>"
+            "<tr><td>1</td><td>foo</td><td>0</td><td>0m 0s</td><td><button class=\"btn danger\" type=\"button\" hx-get=\"/players/0/edit\" hx-trigger=\"click\">EDIT</button></td></tr>"
         );
     }
 }
