@@ -2,9 +2,9 @@ use chrono::Duration;
 use rusqlite::Connection;
 
 use super::Repo;
-use crate::Error;
 use crate::Player;
 use crate::game::{Data, Game, State};
+use crate::{Error, ErrorKind};
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 impl From<rusqlite::Error> for Error {
     fn from(re: rusqlite::Error) -> Error {
         match re {
-            rusqlite::Error::QueryReturnedNoRows => Error::NotFound,
-            _ => Self::Internal(re.to_string()),
+            rusqlite::Error::QueryReturnedNoRows => Self::new(ErrorKind::NotFound),
+            _ => Self::new(ErrorKind::Internal(re.to_string())),
             // Self::Conflict => write!(f, "resource already exists"),
             // Self::NotFound => write!(f, "resource not found"),
             // Self::InvalidInput(msg) => write!(f, "invalid input: {msg}"),
@@ -38,10 +38,10 @@ impl TryFrom<Game> for GameSqlRow {
     type Error = Error;
 
     fn try_from(game: Game) -> Result<Self, Self::Error> {
-        let shared_json =
-            serde_json::to_string(&game.shared).map_err(|e| Error::Internal(e.to_string()))?;
-        let state_json =
-            serde_json::to_string(&game.state).map_err(|e| Error::Internal(e.to_string()))?;
+        let shared_json = serde_json::to_string(&game.shared)
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+        let state_json = serde_json::to_string(&game.state)
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         Ok(GameSqlRow {
             id: game.id,
@@ -55,11 +55,11 @@ impl TryFrom<GameSqlRow> for Game {
     type Error = Error;
 
     fn try_from(row: GameSqlRow) -> Result<Self, Self::Error> {
-        let shared: Data =
-            serde_json::from_str(&row.shared_json).map_err(|e| Error::Internal(e.to_string()))?;
+        let shared: Data = serde_json::from_str(&row.shared_json)
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
-        let state: State =
-            serde_json::from_str(&row.state_json).map_err(|e| Error::Internal(e.to_string()))?;
+        let state: State = serde_json::from_str(&row.state_json)
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         Ok(Game {
             id: row.id,
@@ -114,9 +114,11 @@ impl From<Player> for PlayerSqlRow {
 /// `SqliteRepo` provides a sqlite `Repo` implementation.
 impl SqliteRepo {
     fn get_conn(&self) -> Result<MutexGuard<'_, Connection>, Error> {
-        self.conn
-            .lock()
-            .map_err(|_| Error::Internal("Failed to acquire lock on SQL connection".to_string()))
+        self.conn.lock().map_err(|_| {
+            Error::new(ErrorKind::Internal(
+                "Failed to acquire lock on SQL connection".to_string(),
+            ))
+        })
     }
 
     /// `new` constructs a sqlite repo for persisting game and player data. If a file exists at the
@@ -300,11 +302,11 @@ impl Repo for SqliteRepo {
             .map_err(Error::from)?;
 
         match result {
-            0 => Err(Error::NotFound),
+            0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::Internal(format!(
+            count => Err(Error::new(ErrorKind::Internal(format!(
                 "unexpected updated count: {count}"
-            ))),
+            )))),
         }
     }
 
@@ -323,11 +325,11 @@ impl Repo for SqliteRepo {
         let result = stmt.execute([player_id]).map_err(Error::from)?;
 
         match result {
-            0 => Err(Error::NotFound),
+            0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::Internal(format!(
+            count => Err(Error::new(ErrorKind::Internal(format!(
                 "unexpected deleted count: {count}"
-            ))),
+            )))),
         }
     }
 
@@ -446,11 +448,11 @@ impl Repo for SqliteRepo {
             .map_err(Error::from)?;
 
         match result {
-            0 => Err(Error::NotFound),
+            0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::Internal(format!(
+            count => Err(Error::new(ErrorKind::Internal(format!(
                 "unexpected updated count: {count}"
-            ))),
+            )))),
         }
     }
 
@@ -469,11 +471,11 @@ impl Repo for SqliteRepo {
         let result = stmt.execute([game_id]).map_err(Error::from)?;
 
         match result {
-            0 => Err(Error::NotFound),
+            0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::Internal(format!(
+            count => Err(Error::new(ErrorKind::Internal(format!(
                 "unexpected deleted count: {count}"
-            ))),
+            )))),
         }
     }
 }

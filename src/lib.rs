@@ -5,7 +5,7 @@ pub mod player;
 pub mod repo;
 pub mod svc;
 
-pub use self::error::Error;
+pub use self::error::{Error, ErrorKind};
 pub use self::game::GameView;
 pub use self::game::{Event, EventError};
 pub use self::game::{Game, GameState, into_game_views};

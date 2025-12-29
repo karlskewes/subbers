@@ -1,7 +1,7 @@
 //! `http` wraps the domain service and provides http endpoints for interacting with the Service.
 
 use super::{games_templates, layout_templates, players_templates};
-use crate::{Error, GameView, Service, into_game_views, into_player_views};
+use crate::{Error, ErrorKind, GameView, Service, into_game_views, into_player_views};
 use axum::{
     Router,
     extract::{Form, FromRequestParts, Path, State},
@@ -14,14 +14,15 @@ use base64::prelude::*;
 use maud::Markup;
 use serde::Deserialize;
 use std::sync::Arc;
+use tower_http::trace::TraceLayer;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let status = match self {
-            Self::InvalidInput(_) => StatusCode::BAD_REQUEST,
-            Self::NotFound => StatusCode::NOT_FOUND,
-            Self::Conflict => StatusCode::CONFLICT,
-            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        let status = match self.kind {
+            ErrorKind::InvalidInput(_) => StatusCode::BAD_REQUEST,
+            ErrorKind::NotFound => StatusCode::NOT_FOUND,
+            ErrorKind::Conflict => StatusCode::CONFLICT,
+            ErrorKind::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         let body = self.to_string();
@@ -86,6 +87,11 @@ impl AxumApp {
 
         let auth_config = Arc::new(AuthConfig::new(self.basic_auth));
 
+        let trace_layer = TraceLayer::new_for_http();
+        // .make_span_with(trace_layer::trace_layer_make_span_with)
+        // .on_request(trace_layer::trace_layer_on_request)
+        // .on_response(trace_layer::trace_layer_on_response);
+
         Router::new()
             .route("/", get(home))
             .route("/static/{filename}", get(assets))
@@ -120,6 +126,7 @@ impl AxumApp {
             .with_state(state.clone())
             // basic auth not required for below routes
             .route("/ready", get(ready))
+            .layer(trace_layer)
     }
 }
 
@@ -214,7 +221,7 @@ async fn get_player(
     let player_id: u32 = player_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let player = state.svc.get_player(&player_id)?;
     let body = Html(players_templates::player_table_row(&player.into()).into_string());
@@ -240,7 +247,7 @@ async fn edit_player_form(
     let player_id: u32 = player_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let player = state.svc.get_player(&player_id)?;
     let body = Html(players_templates::player_edit_table_row(&player.into()).into_string());
@@ -256,7 +263,7 @@ async fn edit_player(
     let player_id: u32 = player_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let mut player = state.svc.get_player(&player_id)?;
     player.name = input.name;
@@ -275,7 +282,7 @@ async fn delete_player(
     let player_id: u32 = player_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     state.svc.delete_player(&player_id)?;
 
@@ -310,7 +317,7 @@ async fn assets(Path(filename): Path<String>) -> Result<impl IntoResponse, Error
             include_str!("./assets/robots.txt"),
         ),
         "theme.css" => (mime::TEXT_CSS.as_ref(), include_str!("./assets/theme.css")),
-        _ => return Err(Error::NotFound),
+        _ => return Err(Error::new(ErrorKind::NotFound)),
     };
 
     Ok(([(header::CONTENT_TYPE, content_type)], body))
@@ -343,7 +350,7 @@ async fn get_game(
     let game_id: u32 = game_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let game: GameView = state.svc.get_game(&game_id)?.into();
     let contents = get_game_html(game);
@@ -368,7 +375,7 @@ async fn start_game(
     let game_id: u32 = game_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let game: GameView = state.svc.start_game(&game_id)?.into();
     let body = get_game_html(game).into_string();
@@ -383,7 +390,7 @@ async fn end_game(
     let game_id: u32 = game_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let game: GameView = state.svc.end_game(&game_id)?.into();
     let body = get_game_html(game).into_string();
@@ -398,7 +405,7 @@ async fn start_game_period(
     let game_id: u32 = game_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let game: GameView = state.svc.start_game_period(&game_id)?.into();
     let body = get_game_html(game).into_string();
@@ -413,7 +420,7 @@ async fn end_game_period(
     let game_id: u32 = game_id
         .trim()
         .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("id must be a number".to_string()))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput("id must be a number".to_string())))?;
 
     let game: GameView = state.svc.end_game_period(&game_id)?.into();
     let body = get_game_html(game).into_string();
@@ -431,10 +438,11 @@ async fn upsert_mvp(
     Path(game_id): Path<String>,
     Form(input): Form<GameMVPForm>,
 ) -> Result<impl IntoResponse, Error> {
-    let game_id: u32 = game_id
-        .trim()
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("game id must be a number".to_string()))?;
+    let game_id: u32 = game_id.trim().parse::<u32>().map_err(|_| {
+        Error::new(ErrorKind::InvalidInput(
+            "game id must be a number".to_string(),
+        ))
+    })?;
 
     let game: GameView = state.svc.upsert_mvp(&game_id, &input.player_id)?.into();
     let body = get_game_html(game).into_string();
@@ -446,22 +454,24 @@ async fn sub_player_on(
     State(state): State<AppState>,
     Path((game_id, player_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, Error> {
-    let game_id: u32 = game_id
-        .trim()
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("game id must be a number".to_string()))?;
+    let game_id: u32 = game_id.trim().parse::<u32>().map_err(|_| {
+        Error::new(ErrorKind::InvalidInput(
+            "game id must be a number".to_string(),
+        ))
+    })?;
 
-    let player_id: u32 = player_id
-        .trim()
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("player id must be a number".to_string()))?;
+    let player_id: u32 = player_id.trim().parse::<u32>().map_err(|_| {
+        Error::new(ErrorKind::InvalidInput(
+            "player id must be a number".to_string(),
+        ))
+    })?;
 
     let game: GameView = state.svc.sub_player_on(&game_id, &player_id)?.into();
     let player = game
         .players
         .iter()
         .find(|p| p.id == player_id)
-        .ok_or_else(|| Error::Internal("player not found".to_string()))?;
+        .ok_or_else(|| Error::new(ErrorKind::Internal("player not found".to_string())))?;
 
     let body = Html(
         players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),
@@ -474,22 +484,24 @@ async fn sub_player_off(
     State(state): State<AppState>,
     Path((game_id, player_id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse, Error> {
-    let game_id: u32 = game_id
-        .trim()
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("game id must be a number".to_string()))?;
+    let game_id: u32 = game_id.trim().parse::<u32>().map_err(|_| {
+        Error::new(ErrorKind::InvalidInput(
+            "game id must be a number".to_string(),
+        ))
+    })?;
 
-    let player_id: u32 = player_id
-        .trim()
-        .parse::<u32>()
-        .map_err(|_| Error::InvalidInput("player id must be a number".to_string()))?;
+    let player_id: u32 = player_id.trim().parse::<u32>().map_err(|_| {
+        Error::new(ErrorKind::InvalidInput(
+            "player id must be a number".to_string(),
+        ))
+    })?;
 
     let game: GameView = state.svc.sub_player_off(&game_id, &player_id)?.into();
     let player = game
         .players
         .iter()
         .find(|p| p.id == player_id)
-        .ok_or_else(|| Error::Internal("player not found".to_string()))?;
+        .ok_or_else(|| Error::new(ErrorKind::Internal("player not found".to_string())))?;
 
     let body = Html(
         players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),

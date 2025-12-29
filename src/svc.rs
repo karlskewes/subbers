@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 // TODO: may move/change re-export.
-use super::Error;
 use super::Player;
 use super::Repo;
+use super::{Error, ErrorKind};
 use super::{EventError, Game};
 
 /// `Service` provides `Game` and `Player` management services, storing data in its repository.
@@ -75,8 +75,12 @@ impl Service {
             .get_game(game_id)?
             .on_event(crate::Event::StartGame)
             .map_err(|e| match e {
-                EventError::NoOp => Error::InvalidInput("game already started".to_string()),
-                EventError::Invalid => Error::InvalidInput("no state change".to_string()),
+                EventError::NoOp => {
+                    Error::new(ErrorKind::InvalidInput("game already started".to_string()))
+                }
+                EventError::Invalid => {
+                    Error::new(ErrorKind::InvalidInput("no state change".to_string()))
+                }
             })?;
 
         self.repo.update_game(game.clone())?;
@@ -90,8 +94,12 @@ impl Service {
             .get_game(game_id)?
             .on_event(crate::Event::EndGame)
             .map_err(|e| match e {
-                EventError::NoOp => Error::InvalidInput("game already ended".to_string()),
-                EventError::Invalid => Error::InvalidInput("no state change".to_string()),
+                EventError::NoOp => {
+                    Error::new(ErrorKind::InvalidInput("game already ended".to_string()))
+                }
+                EventError::Invalid => {
+                    Error::new(ErrorKind::InvalidInput("no state change".to_string()))
+                }
             })?;
 
         for p in game.shared.players.iter_mut() {
@@ -117,8 +125,12 @@ impl Service {
             .get_game(game_id)?
             .on_event(crate::Event::StartPeriod)
             .map_err(|e| match e {
-                EventError::NoOp => Error::InvalidInput("period already started".to_string()),
-                EventError::Invalid => Error::InvalidInput("no state change".to_string()),
+                EventError::NoOp => Error::new(ErrorKind::InvalidInput(
+                    "period already started".to_string(),
+                )),
+                EventError::Invalid => {
+                    Error::new(ErrorKind::InvalidInput("no state change".to_string()))
+                }
             })?;
 
         self.repo.update_game(game.clone())?;
@@ -132,8 +144,12 @@ impl Service {
             .get_game(game_id)?
             .on_event(crate::Event::EndPeriod)
             .map_err(|e| match e {
-                EventError::NoOp => Error::InvalidInput("period already ended".to_string()),
-                EventError::Invalid => Error::InvalidInput("no state change".to_string()),
+                EventError::NoOp => {
+                    Error::new(ErrorKind::InvalidInput("period already ended".to_string()))
+                }
+                EventError::Invalid => {
+                    Error::new(ErrorKind::InvalidInput("no state change".to_string()))
+                }
             })?;
 
         for p in game.shared.players.iter_mut() {
@@ -152,7 +168,7 @@ impl Service {
             .players
             .iter_mut()
             .find(|p| &p.id == player_id)
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::new(ErrorKind::NotFound))?;
 
         player.sub_on();
         self.repo.update_game(game.clone())?;
@@ -167,7 +183,7 @@ impl Service {
             .players
             .iter_mut()
             .find(|p| &p.id == player_id)
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::new(ErrorKind::NotFound))?;
 
         player.sub_off();
         self.repo.update_game(game.clone())?;
@@ -181,7 +197,7 @@ impl Service {
             .players
             .iter()
             .find(|p| &p.id == player_id)
-            .ok_or(Error::NotFound)?;
+            .ok_or(Error::new(ErrorKind::NotFound))?;
 
         game.shared.mvp = Some(*player_id);
         self.repo.update_game(game.clone())?;

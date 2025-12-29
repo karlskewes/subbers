@@ -1,7 +1,7 @@
 use super::Repo;
-use crate::Error;
 use crate::Game;
 use crate::Player;
+use crate::{Error, ErrorKind};
 
 use std::cmp::Reverse;
 use std::{
@@ -31,7 +31,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         Ok(store.len())
     }
@@ -40,7 +40,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         let mut players: Vec<Player> = store.values().cloned().collect();
         players.sort_by_key(|p| p.name.to_lowercase());
@@ -52,12 +52,13 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .players
             .write()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
-        let id: u32 = u32::try_from(store.len()).map_err(|e| Error::Internal(e.to_string()))?;
+        let id: u32 = u32::try_from(store.len())
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         if store.contains_key(&id) {
-            return Err(Error::Conflict);
+            return Err(Error::new(ErrorKind::Conflict));
         }
 
         let player = Player::new(id, number, name);
@@ -71,11 +72,11 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         store
             .get(player_id)
-            .map_or_else(|| Err(Error::NotFound), |p| Ok(p.clone()))
+            .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |p| Ok(p.clone()))
     }
 
     fn update_player(&self, player: Player) -> Result<(), Error> {
@@ -83,10 +84,10 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .players
                 .write()
-                .map_err(|e| Error::Internal(e.to_string()))?;
+                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
             if !store.contains_key(&player.number) {
-                return Err(Error::NotFound);
+                return Err(Error::new(ErrorKind::NotFound));
             }
 
             _ = store.insert(player.number, player);
@@ -99,18 +100,18 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .players
             .write()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         store
             .remove(player_id)
-            .map_or_else(|| Err(Error::NotFound), |_p| Ok(()))
+            .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |_p| Ok(()))
     }
 
     fn count_games(&self) -> Result<usize, Error> {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         Ok(store.len())
     }
@@ -119,7 +120,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         let mut games: Vec<Game> = store.values().cloned().collect();
         games.sort_by_key(|g| Reverse(g.id)); // Descending (newest).
@@ -131,10 +132,10 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .games
                 .write()
-                .map_err(|e| Error::Internal(e.to_string()))?;
+                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
             if store.contains_key(&game.id) {
-                return Err(Error::Conflict);
+                return Err(Error::new(ErrorKind::Conflict));
             }
 
             _ = store.insert(game.id, game);
@@ -147,11 +148,11 @@ impl Repo for InMemoryRepo {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         store
             .get(game_id)
-            .map_or_else(|| Err(Error::NotFound), |g| Ok(g.clone()))
+            .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |g| Ok(g.clone()))
     }
 
     fn update_game(&self, game: Game) -> Result<(), Error> {
@@ -159,10 +160,10 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .games
                 .write()
-                .map_err(|e| Error::Internal(e.to_string()))?;
+                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
             if !store.contains_key(&game.id) {
-                return Err(Error::NotFound);
+                return Err(Error::new(ErrorKind::NotFound));
             }
 
             _ = store.insert(game.id, game);
@@ -175,10 +176,10 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .games
             .write()
-            .map_err(|e| Error::Internal(e.to_string()))?;
+            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
 
         store
             .remove(game_id)
-            .map_or_else(|| Err(Error::NotFound), |_g| Ok(()))
+            .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |_g| Ok(()))
     }
 }
