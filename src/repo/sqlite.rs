@@ -13,7 +13,7 @@ impl From<rusqlite::Error> for Error {
     fn from(re: rusqlite::Error) -> Error {
         match re {
             rusqlite::Error::QueryReturnedNoRows => Self::new(ErrorKind::NotFound),
-            _ => Self::new(ErrorKind::Internal(re.to_string())),
+            _ => Self::new(ErrorKind::Internal).with_source(re),
             // Self::Conflict => write!(f, "resource already exists"),
             // Self::NotFound => write!(f, "resource not found"),
             // Self::InvalidInput(msg) => write!(f, "invalid input: {msg}"),
@@ -39,9 +39,9 @@ impl TryFrom<Game> for GameSqlRow {
 
     fn try_from(game: Game) -> Result<Self, Self::Error> {
         let shared_json = serde_json::to_string(&game.shared)
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
         let state_json = serde_json::to_string(&game.state)
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
 
         Ok(GameSqlRow {
             id: game.id,
@@ -56,10 +56,10 @@ impl TryFrom<GameSqlRow> for Game {
 
     fn try_from(row: GameSqlRow) -> Result<Self, Self::Error> {
         let shared: Data = serde_json::from_str(&row.shared_json)
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
 
         let state: State = serde_json::from_str(&row.state_json)
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
 
         Ok(Game {
             id: row.id,
@@ -114,10 +114,10 @@ impl From<Player> for PlayerSqlRow {
 /// `SqliteRepo` provides a sqlite `Repo` implementation.
 impl SqliteRepo {
     fn get_conn(&self) -> Result<MutexGuard<'_, Connection>, Error> {
-        self.conn.lock().map_err(|_| {
-            Error::new(ErrorKind::Internal(
-                "Failed to acquire lock on SQL connection".to_string(),
-            ))
+        self.conn.lock().map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context("Failed to acquire lock on SQL connection".to_string())
+                .with_source_str(e.to_string())
         })
     }
 
@@ -304,9 +304,8 @@ impl Repo for SqliteRepo {
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::new(ErrorKind::Internal(format!(
-                "unexpected updated count: {count}"
-            )))),
+            count => Err(Error::new(ErrorKind::Internal)
+                .with_context(format!("unexpected updated count: {count}"))),
         }
     }
 
@@ -327,9 +326,8 @@ impl Repo for SqliteRepo {
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::new(ErrorKind::Internal(format!(
-                "unexpected deleted count: {count}"
-            )))),
+            count => Err(Error::new(ErrorKind::Internal)
+                .with_context(format!("unexpected deleted count: {count}"))),
         }
     }
 
@@ -450,9 +448,8 @@ impl Repo for SqliteRepo {
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::new(ErrorKind::Internal(format!(
-                "unexpected updated count: {count}"
-            )))),
+            count => Err(Error::new(ErrorKind::Internal)
+                .with_context(format!("unexpected updated count: {count}"))),
         }
     }
 
@@ -473,9 +470,8 @@ impl Repo for SqliteRepo {
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),
             1 => Ok(()),
-            count => Err(Error::new(ErrorKind::Internal(format!(
-                "unexpected deleted count: {count}"
-            )))),
+            count => Err(Error::new(ErrorKind::Internal)
+                .with_context(format!("unexpected deleted count: {count}"))),
         }
     }
 }

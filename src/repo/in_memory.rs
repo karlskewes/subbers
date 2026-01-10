@@ -31,7 +31,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         Ok(store.len())
     }
@@ -40,7 +40,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         let mut players: Vec<Player> = store.values().cloned().collect();
         players.sort_by_key(|p| p.name.to_lowercase());
@@ -52,10 +52,10 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .players
             .write()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         let id: u32 = u32::try_from(store.len())
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
 
         if store.contains_key(&id) {
             return Err(Error::new(ErrorKind::Conflict));
@@ -72,7 +72,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .players
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         store
             .get(player_id)
@@ -84,7 +84,7 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .players
                 .write()
-                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+                .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
             if !store.contains_key(&player.number) {
                 return Err(Error::new(ErrorKind::NotFound));
@@ -100,7 +100,7 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .players
             .write()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         store
             .remove(player_id)
@@ -111,7 +111,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         Ok(store.len())
     }
@@ -120,7 +120,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         let mut games: Vec<Game> = store.values().cloned().collect();
         games.sort_by_key(|g| Reverse(g.id)); // Descending (newest).
@@ -132,7 +132,7 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .games
                 .write()
-                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+                .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
             if store.contains_key(&game.id) {
                 return Err(Error::new(ErrorKind::Conflict));
@@ -148,7 +148,7 @@ impl Repo for InMemoryRepo {
         let store = self
             .games
             .read()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         store
             .get(game_id)
@@ -160,7 +160,7 @@ impl Repo for InMemoryRepo {
             let mut store = self
                 .games
                 .write()
-                .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+                .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
             if !store.contains_key(&game.id) {
                 return Err(Error::new(ErrorKind::NotFound));
@@ -176,7 +176,7 @@ impl Repo for InMemoryRepo {
         let mut store = self
             .games
             .write()
-            .map_err(|e| Error::new(ErrorKind::Internal(e.to_string())))?;
+            .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         store
             .remove(game_id)

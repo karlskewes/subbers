@@ -22,7 +22,7 @@ impl IntoResponse for Error {
             ErrorKind::InvalidInput(_) => StatusCode::BAD_REQUEST,
             ErrorKind::NotFound => StatusCode::NOT_FOUND,
             ErrorKind::Conflict => StatusCode::CONFLICT,
-            ErrorKind::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         let body = self.to_string();
@@ -471,7 +471,9 @@ async fn sub_player_on(
         .players
         .iter()
         .find(|p| p.id == player_id)
-        .ok_or_else(|| Error::new(ErrorKind::Internal("player not found".to_string())))?;
+        .ok_or_else(|| {
+            Error::new(ErrorKind::Internal).with_context("player not found".to_string())
+        })?;
 
     let body = Html(
         players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),
@@ -501,7 +503,9 @@ async fn sub_player_off(
         .players
         .iter()
         .find(|p| p.id == player_id)
-        .ok_or_else(|| Error::new(ErrorKind::Internal("player not found".to_string())))?;
+        .ok_or_else(|| {
+            Error::new(ErrorKind::Internal).with_context("player not found".to_string())
+        })?;
 
     let body = Html(
         players_templates::player_actions_table_row(&game.id, &game.state, player).into_string(),
