@@ -14,11 +14,11 @@ pub enum ErrorKind {
 /// Error is the core Error type encompassing all error details.
 pub struct Error {
     /// kind is the Error variant.
-    pub kind: ErrorKind,
+    kind: ErrorKind,
     /// context contains any operator targeted messaging.
-    pub context: Option<String>,
+    context: Option<String>,
     /// source contains any downstream or dependency error that was encountered.
-    pub source: Option<Box<dyn std::error::Error + Send + Sync>>,
+    source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
 impl Error {
@@ -46,6 +46,10 @@ impl Error {
     pub fn with_source_str(self, source: String) -> Self {
         let s = StringError(source);
         self.with_source(s)
+    }
+
+    pub fn kind(&self) -> &ErrorKind {
+        &self.kind
     }
 }
 

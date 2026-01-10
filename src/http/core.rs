@@ -18,7 +18,7 @@ use tower_http::trace::TraceLayer;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let status = match self.kind {
+        let status = match self.kind() {
             ErrorKind::InvalidInput(_) => StatusCode::BAD_REQUEST,
             ErrorKind::NotFound => StatusCode::NOT_FOUND,
             ErrorKind::Conflict => StatusCode::CONFLICT,
