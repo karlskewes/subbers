@@ -66,11 +66,11 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn build(args: &[String]) -> Result<Config, std::io::Error> {
+    pub fn build(args: &[String]) -> Result<Config, Error> {
         let mut cfg = Config::default();
 
         let args = CLIArgs::try_parse_from(args)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+            .map_err(|e| Error::new(ErrorKind::InvalidInput(e.to_string())))?;
 
         cfg.repo_config = RepoConfig::Sqlite(args.sqlite_filepath);
 
@@ -84,22 +84,19 @@ impl Config {
             .map(|ba| {
                 ba.split_once(':')
                     .ok_or_else(|| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            "basic auth must be in the form 'user:pass'",
-                        )
+                        Error::new(ErrorKind::InvalidInput(
+                            "basic auth must be in the form 'user:pass'".to_string(),
+                        ))
                     })
                     .and_then(|(username, password)| {
                         if username.is_empty() {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                "basic auth username cannot be empty",
-                            ))
+                            Err(Error::new(ErrorKind::InvalidInput(
+                                "basic auth username cannot be empty".to_string(),
+                            )))
                         } else if password.is_empty() {
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::InvalidInput,
-                                "basic auth password cannot be empty",
-                            ))
+                            Err(Error::new(ErrorKind::InvalidInput(
+                                "basic auth password cannot be empty".to_string(),
+                            )))
                         } else {
                             Ok(User {
                                 username: username.to_string(),
