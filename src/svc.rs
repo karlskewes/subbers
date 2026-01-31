@@ -5,8 +5,10 @@ use std::sync::Arc;
 // TODO: may move/change re-export.
 use super::Player;
 use super::Repo;
+use super::metrics;
 use super::{Error, ErrorKind};
 use super::{EventError, Game};
+use metrics;
 
 /// `Service` provides `Game` and `Player` management services, storing data in its repository.
 #[derive(Clone)]
@@ -203,5 +205,13 @@ impl Service {
         self.repo.update_game(game.clone())?;
 
         Ok(game)
+    }
+
+    fn register_metrics() {
+        metrics::describe_counter!(
+            metric!("upsert_mvp"),
+            metrics::Unit::Count,
+            "upsert game mvp"
+        );
     }
 }

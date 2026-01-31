@@ -1,13 +1,14 @@
 [package]
 name = "subbers"
-description = "Manage your sports game subs"
-readme = "README.md"
-license = "MIT"
-repository = "https://github.com/karlskewes/subbers"
-keywords = ["sports"]
-categories = ["games"]
 version = "0.1.0"
 edition = "2024"
+description = "Manage your sports game subs"
+readme = "README.md"
+repository = "https://github.com/karlskewes/subbers"
+license = "MIT"
+keywords = ["sports"]
+categories = ["games"]
+build = "./build.rs"
 
 [lib]
 name = "subbers"
@@ -19,7 +20,10 @@ chrono = { version = "0.4.41", features = ["serde"] }
 clap = { version = "4.5.42", features = ["derive"] }
 http-body-util = "0.1.3"
 maud = { version = "0.27.0", features = [] }
+metrics = "0.24.3"
+metrics-exporter-prometheus = "0.18.1"
 mime = "0.3.17"
+reqwest = { version = "0.13.1", features = ["blocking"] }
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"

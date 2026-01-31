@@ -1,6 +1,7 @@
 pub mod error;
 pub mod game;
 pub mod http;
+pub mod metrics;
 pub mod player;
 pub mod repo;
 pub mod svc;
@@ -15,12 +16,14 @@ pub use self::repo::{InMemoryRepo, Repo, SqliteRepo};
 pub use self::svc::Service;
 
 use clap::Parser;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const SQLITE_FILEPATH: &str = "subbers.sql";
 const LISTEN_ADDR: &str = "0.0.0.0:8080";
+const METRICS_LISTEN_ADDR: &str = "0.0.0.0:8081";
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -32,6 +35,10 @@ struct CLIArgs {
     /// Listen Address for HTTP server
     #[arg(short, long, default_value = LISTEN_ADDR)]
     listen_addr: String,
+
+    /// Listen Address for Prometheus Metrics HTTP server
+    #[arg(short, long, default_value = METRICS_LISTEN_ADDR)]
+    metrics_listen_addr: String,
 
     /// Basic Auth 'user:pass' for HTTP server
     #[arg(short, long)]
@@ -52,15 +59,19 @@ impl Default for RepoConfig {
 pub struct Config {
     repo_config: RepoConfig,
     listen_addr: String,
+    metrics_listen_addr: String,
     basic_auth: Option<User>,
+    version: String,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             listen_addr: String::from(LISTEN_ADDR),
+            metrics_listen_addr: String::from(METRICS_LISTEN_ADDR),
             repo_config: RepoConfig::default(),
             basic_auth: None,
+            version: "devel".to_string(),
         }
     }
 }
@@ -76,6 +87,15 @@ impl Config {
 
         if !args.listen_addr.is_empty() {
             cfg.listen_addr = args.listen_addr;
+        }
+
+        if !args.metrics_listen_addr.is_empty() {
+            cfg.metrics_listen_addr = args.metrics_listen_addr;
+        }
+
+        let version = env!("GIT_HASH");
+        if !version.is_empty() {
+            cfg.version = version.to_string();
         }
 
         cfg.basic_auth = args
@@ -121,6 +141,16 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    let metrics_listen_addr: SocketAddr = cfg.metrics_listen_addr.parse().map_err(|e| {
+        Error::new(ErrorKind::InvalidInput(format!(
+            "--metrics-listen-addr '{}' is not a valid <IP>:<PORT>",
+            cfg.metrics_listen_addr
+        )))
+        .with_source(e)
+    })?;
+
+    metrics::init_prometheus_endpoint(metrics_listen_addr, cfg.version)?;
 
     let repo: Arc<dyn Repo> = match cfg.repo_config {
         RepoConfig::InMemory => Arc::new(InMemoryRepo::new()),
