@@ -1,7 +1,7 @@
+mod app_metrics;
 pub mod error;
 pub mod game;
 pub mod http;
-pub mod metrics;
 pub mod player;
 pub mod repo;
 pub mod svc;
@@ -150,7 +150,7 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
         .with_source(e)
     })?;
 
-    metrics::init_prometheus_endpoint(metrics_listen_addr, cfg.version)?;
+    app_metrics::init_prometheus_endpoint(metrics_listen_addr, cfg.version)?;
 
     let repo: Arc<dyn Repo> = match cfg.repo_config {
         RepoConfig::InMemory => Arc::new(InMemoryRepo::new()),

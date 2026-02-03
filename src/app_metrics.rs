@@ -1,13 +1,24 @@
-use metrics;
-use metrics_exporter_prometheus;
+use super::{Error, ErrorKind};
 use std::net::SocketAddr;
 
-use super::{Error, ErrorKind};
-
 /// metric generates a namespaced metric name where the supplied `name` is prefixed with `subbers_` making it `subbers_<name>`.
+#[macro_export]
 macro_rules! metric {
-    ($name:literal) => {
+    ($name:expr) => {
         concat!("subbers_", $name)
+    };
+}
+
+#[macro_export]
+macro_rules! describe_metric_counters {
+    ($entity:literal, $($action:literal), + $(,)?) => {
+        $(
+            metrics::describe_counter!(
+                $crate::metric!(concat!("subbers_", $entity, "_", $action)),
+                metrics::Unit::Count,
+                concat!($action, " ", $entity)
+            );
+        )+
     };
 }
 

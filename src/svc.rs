@@ -5,7 +5,6 @@ use std::sync::Arc;
 // TODO: may move/change re-export.
 use super::Player;
 use super::Repo;
-use super::metrics;
 use super::{Error, ErrorKind};
 use super::{EventError, Game};
 use metrics;
@@ -22,6 +21,8 @@ pub fn new(repo: Arc<dyn Repo>) -> Service {
 
 impl Service {
     pub fn new(repo: Arc<dyn Repo>) -> Self {
+        register_metrics();
+
         Self { repo }
     }
 
@@ -206,12 +207,47 @@ impl Service {
 
         Ok(game)
     }
+}
 
-    fn register_metrics() {
-        metrics::describe_counter!(
-            metric!("upsert_mvp"),
-            metrics::Unit::Count,
-            "upsert game mvp"
-        );
-    }
+fn register_metrics() {
+    metrics::describe_counter!(
+        crate::metric!("list_players"),
+        metrics::Unit::Count,
+        "list players"
+    );
+
+    crate::describe_metric_counters!(
+        // entity
+        "player", // actions follow, formatting!!
+        "create", "get", "update", "delete"
+    );
+
+    metrics::describe_counter!(
+        crate::metric!("list_games"),
+        metrics::Unit::Count,
+        "list games"
+    );
+
+    crate::describe_metric_counters!(
+        // entity
+        "game",
+        // actions
+        "create",
+        "get",
+        "update",
+        "delete",
+        "start",
+        "end",
+        "period_start",
+        "period_end",
+        "sub_player_on",
+        "sub_player_off",
+        "upsert_mvp"
+    );
+
+    metrics::describe_counter!(
+        crate::metric!("upsert_mvp"),
+        metrics::Unit::Count,
+        "upsert game mvp"
+    );
 }
