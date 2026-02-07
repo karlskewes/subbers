@@ -2,6 +2,7 @@ mod core;
 mod games_templates;
 mod icon_templates;
 mod layout_templates;
+mod middlewares;
 mod players_templates;
 
 pub use core::{AxumApp, User};

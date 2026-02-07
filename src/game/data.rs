@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 /// the official term but here we use `Period` for all.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Period {
-    pub start_time: DateTime<Utc>,       // TODO: time.Time{} equivalent?
-    pub end_time: Option<DateTime<Utc>>, // TODO: time.Time{} equivalent?
+    pub start_time: DateTime<Utc>,
+    pub end_time: Option<DateTime<Utc>>,
 }
 
 /// `Data` represents the unique data per game.

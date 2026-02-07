@@ -2,8 +2,8 @@
 
 Manage subs for your sports game.
 
-Run the app locally on a laptop or home server and then access from your mobile
-phone at the game via Tailscale VPN or similar.
+Only HTTP Basic Authentication is supported so consider running an
+authentication proxy in front or access the app via VPN or similar.
 
 ## Getting Started
 
@@ -13,7 +13,8 @@ phone at the game via Tailscale VPN or similar.
 cargo run
 ```
 
-[View app](http://localhost:8080/)
+- [View app](http://localhost:8080/)
+- [View metrics](http://localhost:8081/metrics)
 
 Alternatively:
 
@@ -26,11 +27,18 @@ Manage your sports game subs
 Usage: subbers [OPTIONS]
 
 Options:
-  -s, --sqlite-filepath <SQLITE_FILEPATH>  SQLite file path [default: subbers.sql]
-  -l, --listen-addr <LISTEN_ADDR>          Listen Address for HTTP server [default: 0.0.0.0:8080]
-  -b, --basic-auth <BASIC_AUTH>            Basic Auth 'user:pass' for HTTP server
-  -h, --help                               Print help
-  -V, --version                            Print version
+  -s, --sqlite-filepath <SQLITE_FILEPATH>
+          SQLite file path [default: subbers.sql]
+  -l, --listen-addr <LISTEN_ADDR>
+          Listen Address for HTTP server [default: 0.0.0.0:8080]
+  -m, --metrics-listen-addr <METRICS_LISTEN_ADDR>
+          Listen Address for Prometheus Metrics HTTP server [default: 0.0.0.0:8081]
+  -b, --basic-auth <BASIC_AUTH>
+          Basic Auth 'user:pass' for HTTP server
+  -h, --help
+          Print help
+  -V, --version
+          Print version
 ```
 
 #### Create Players

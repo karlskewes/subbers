@@ -10,7 +10,7 @@ target/
 *.pdb
 
 # database
-subbers.sql
+subbers.sql*
 
 # nix output
 result

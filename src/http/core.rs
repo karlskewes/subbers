@@ -1,19 +1,18 @@
 //! `http` wraps the domain service and provides http endpoints for interacting with the Service.
 
 use super::{games_templates, layout_templates, players_templates};
+use crate::http::middlewares::{AuthConfig, AxumAppMetrics};
 use crate::{Error, ErrorKind, GameView, Service, into_game_views, into_player_views};
 use axum::{
     Router,
-    extract::{Form, FromRequestParts, Path, State},
-    http::{StatusCode, header, request::Parts},
-    middleware::{self},
+    extract::{Form, Path, State},
+    http::{StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
-use base64::prelude::*;
 use maud::Markup;
 use serde::Deserialize;
-use std::sync::Arc;
+use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 
 impl IntoResponse for Error {
@@ -31,41 +30,27 @@ impl IntoResponse for Error {
     }
 }
 
-#[derive(Clone)]
-struct AuthConfig {
-    basic_auth: Option<User>, // could make hashmap with a User struct, name/pass/role.
-}
-
-impl AuthConfig {
-    fn new(basic_auth: Option<User>) -> Self {
-        Self { basic_auth }
-    }
-
-    // validate checks the provided AUTHORIZATION header value matches any configured auth values.
-    fn validate(&self, user: Option<User>) -> bool {
-        match (&self.basic_auth, user) {
-            (None, _) => true,
-            (Some(_), None) => false,
-            (Some(want), Some(got)) => {
-                want.username == got.username && want.password == got.password
-            }
-        }
-    }
-}
-
 pub struct AxumApp {
-    // tracing, etc
     basic_auth: Option<User>,
     listen_addr: String,
+    metrics: AxumAppMetrics,
     svc: Service,
 }
 
 impl AxumApp {
     #[must_use]
-    pub fn new(listen_addr: String, basic_auth: Option<User>, svc: Service) -> Self {
+    pub fn new(
+        listen_addr: String,
+        basic_auth: Option<User>,
+        prometheus_registry: &mut prometheus_client::registry::Registry,
+        svc: Service,
+    ) -> Self {
+        let metrics = AxumAppMetrics::new(prometheus_registry);
+        // TODO: consider creating optional middlewares (Servicebuilder) here.
         Self {
             listen_addr,
             basic_auth,
+            metrics,
             svc,
         }
     }
@@ -75,7 +60,7 @@ impl AxumApp {
         F: Future<Output = ()> + Send + 'static,
     {
         let listener = tokio::net::TcpListener::bind(&self.listen_addr).await?;
-        tracing::info!("listening on http://{}", listener.local_addr()?);
+        tracing::info!("app listening on http://{}", listener.local_addr()?);
 
         axum::serve(listener, self.into_router())
             .with_graceful_shutdown(shutdown_signal)
@@ -83,10 +68,17 @@ impl AxumApp {
     }
 
     pub fn into_router(self) -> Router {
-        let state = AppState { svc: self.svc };
+        let state = AppState {
+            svc: self.svc, // struct members (repo) already Arc.
+        };
 
-        let auth_config = Arc::new(AuthConfig::new(self.basic_auth));
+        let auth_middleware = AuthConfig::new(self.basic_auth).into_middleware();
 
+        // TODO: create .into_middleware() method
+        let metrics_layer = axum::middleware::from_fn_with_state(
+            self.metrics.clone(),
+            crate::http::middlewares::track_metrics,
+        );
         let trace_layer = TraceLayer::new_for_http();
         // .make_span_with(trace_layer::trace_layer_make_span_with)
         // .on_request(trace_layer::trace_layer_on_request)
@@ -118,15 +110,17 @@ impl AxumApp {
                 get(get_player).put(edit_player).delete(delete_player),
             )
             .route("/players/{player_id}/edit", get(edit_player_form))
-            // basic auth required for above route(s)
-            .route_layer(middleware::from_extractor_with_state::<RequireAuth, _>(
-                auth_config.clone(),
-            ))
+            // middlewares
+            .route_layer(auth_middleware)
+            .layer(
+                ServiceBuilder::new()
+                    .layer(trace_layer)
+                    .layer(metrics_layer),
+            )
             // state (db, etc)
-            .with_state(state.clone())
+            .with_state(state)
             // basic auth not required for below routes
             .route("/ready", get(ready))
-            .layer(trace_layer)
     }
 }
 
@@ -145,54 +139,6 @@ struct NewPlayerForm {
 pub struct User {
     pub username: String,
     pub password: String,
-}
-
-// RequireAuth implements the Axum Extractor to perform authorization.
-#[derive(Clone)]
-struct RequireAuth {}
-
-// decode_basic_auth will attempt to decode the 'user:pass' and if any errors are present will
-// silently return None. TODO: Consider returning HTTP BAD_REQUEST 400's.
-fn decode_basic_auth(header_value: String) -> Option<User> {
-    let b64 = header_value.strip_prefix("Basic ")?;
-    let decoded = BASE64_STANDARD.decode(b64).ok()?;
-    let userpass = String::from_utf8(decoded).ok()?;
-    let (username, password) = userpass.split_once(':')?;
-
-    Some(User {
-        username: username.to_string(),
-        password: password.to_string(),
-    })
-}
-
-impl FromRequestParts<Arc<AuthConfig>> for RequireAuth {
-    type Rejection = Response;
-
-    async fn from_request_parts(
-        parts: &mut Parts,
-        auth_config: &Arc<AuthConfig>,
-    ) -> Result<Self, Self::Rejection> {
-        let user = parts
-            .headers
-            .get(header::AUTHORIZATION) // typically only specified once, ignore rest.
-            .and_then(|hv| hv.to_str().ok())
-            .and_then(|hv| decode_basic_auth(hv.to_string())); // TODO: handle error 400 instead of
-        // just returning None.
-
-        // TODO: consider passing parts.uri & parts.method if add roles (admin, viewer).
-        if auth_config.validate(user) {
-            return Ok(Self {});
-        }
-
-        Err((
-            StatusCode::UNAUTHORIZED,
-            [(
-                header::WWW_AUTHENTICATE,
-                "Basic realm=\"Credentials required\"",
-            )],
-        )
-            .into_response())
-    }
 }
 
 async fn ready() -> impl IntoResponse {
@@ -530,8 +476,10 @@ mod tests {
     async fn test_get() {
         let cfg = Config::default();
         let repo = Arc::new(InMemoryRepo::new());
+
+        let mut prometheus_registry = prometheus_client::registry::Registry::default();
         let svc = Service::new(repo);
-        let app = AxumApp::new(cfg.listen_addr, None, svc).into_router();
+        let app = AxumApp::new(cfg.listen_addr, None, &mut prometheus_registry, svc).into_router();
 
         let response = app
             .oneshot(
@@ -550,8 +498,9 @@ mod tests {
     async fn test_post() {
         let cfg = Config::default();
         let repo = Arc::new(InMemoryRepo::new());
+        let mut prometheus_registry = prometheus_client::registry::Registry::default();
         let svc = Service::new(repo);
-        let app = AxumApp::new(cfg.listen_addr, None, svc).into_router();
+        let app = AxumApp::new(cfg.listen_addr, None, &mut prometheus_registry, svc).into_router();
 
         let response = app
             .oneshot(

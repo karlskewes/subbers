@@ -1,7 +1,7 @@
-mod app_metrics;
 pub mod error;
 pub mod game;
 pub mod http;
+mod metrics;
 pub mod player;
 pub mod repo;
 pub mod svc;
@@ -11,12 +11,12 @@ pub use self::game::GameView;
 pub use self::game::{Event, EventError};
 pub use self::game::{Game, GameState, into_game_views};
 pub use self::http::{AxumApp, User};
+use self::metrics::AxumMetricsApp;
 pub use self::player::{Player, PlayerView, into_player_views};
 pub use self::repo::{InMemoryRepo, Repo, SqliteRepo};
 pub use self::svc::Service;
 
 use clap::Parser;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -142,15 +142,7 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let metrics_listen_addr: SocketAddr = cfg.metrics_listen_addr.parse().map_err(|e| {
-        Error::new(ErrorKind::InvalidInput(format!(
-            "--metrics-listen-addr '{}' is not a valid <IP>:<PORT>",
-            cfg.metrics_listen_addr
-        )))
-        .with_source(e)
-    })?;
-
-    app_metrics::init_prometheus_endpoint(metrics_listen_addr, cfg.version)?;
+    let mut prometheus_registry = metrics::create_registry(cfg.version.clone())?;
 
     let repo: Arc<dyn Repo> = match cfg.repo_config {
         RepoConfig::InMemory => Arc::new(InMemoryRepo::new()),
@@ -159,12 +151,24 @@ pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
             Arc::new(sqlite)
         }
     };
+
     let svc = Service::new(repo);
-    let app = AxumApp::new(cfg.listen_addr, cfg.basic_auth, svc);
+    let app = AxumApp::new(
+        cfg.listen_addr,
+        cfg.basic_auth,
+        &mut prometheus_registry,
+        svc,
+    );
+
+    // read only prometheus registry for displaying metrics (encoding to HTTP/TUI/etc)
+    let prometheus_registry_ro = Arc::new(prometheus_registry);
+    let metrics_app = AxumMetricsApp::new(cfg.metrics_listen_addr, prometheus_registry_ro);
 
     tracing::info!(message = "starting server");
-    app.run(shutdown_signal()).await?;
-
+    tokio::try_join!(
+        app.run(shutdown_signal()),         // 8080
+        metrics_app.run(shutdown_signal()), // 8081
+    )?;
     tracing::info!(message = "shutting down");
     Ok(())
 }
