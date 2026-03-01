@@ -1,6 +1,15 @@
-{ rustPlatform }:
+{ lib, rustPlatform }:
 rustPlatform.buildRustPackage {
   name = "subbers";
-  src = ./.;
   cargoLock.lockFile = ./Cargo.lock;
+  src = lib.fileset.toSource {
+    root = ./.;
+    fileset = lib.fileset.unions [
+      ./src
+      ./build.rs
+      ./Cargo.toml
+      ./Cargo.lock
+    ];
+  };
+
 }
