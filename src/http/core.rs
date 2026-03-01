@@ -60,7 +60,7 @@ impl AxumApp {
         F: Future<Output = ()> + Send + 'static,
     {
         let listener = tokio::net::TcpListener::bind(&self.listen_addr).await?;
-        tracing::info!("app listening on http://{}", listener.local_addr()?);
+        tracing::info!("listening on http://{}", listener.local_addr()?);
 
         axum::serve(listener, self.into_router())
             .with_graceful_shutdown(shutdown_signal)
@@ -242,7 +242,7 @@ async fn list_players(State(state): State<AppState>) -> Result<impl IntoResponse
     Ok((StatusCode::OK, body))
 }
 
-// assets serves files embedded into the application. With 'cargo watch -x run' it's not
+// assets serves files embedded into the application. With 'bacon run' it's not
 // too awkward for development and is simple for deployment.
 async fn assets(Path(filename): Path<String>) -> Result<impl IntoResponse, Error> {
     let (content_type, body) = match filename.as_str() {
