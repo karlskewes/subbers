@@ -1,6 +1,6 @@
 use super::icon_templates::{play_svg, stop_svg};
 use crate::{GameState, GameView, PlayerView};
-use maud::{Markup, PreEscaped, html};
+use maud::{Markup, html};
 
 pub fn list_games(games: &[GameView]) -> Markup {
     let rows: Vec<Markup> = games.iter().map(game_table_row).collect();
@@ -50,80 +50,55 @@ pub fn game_table_row(game: &GameView) -> Markup {
                     button class="primary small small-elevate" type="button" { (game.id) }
                 }
             }
-            (PreEscaped(game_table_row_columns(game)))
+            (game_table_row_columns(game))
         }
     }
 }
 
-// maudfmt doesn't support multiple match patterns, so build a slice of table columns and then
-// convert to html and return at the end.
-pub fn game_table_row_columns(game: &GameView) -> String {
-    let mut columns = vec![];
-
-    let ph = "-".to_string();
-
-    // Started
-    match game.state {
-        GameState::NotStarted => {
-            columns.push(ph.clone());
+pub fn game_table_row_columns(game: &GameView) -> Markup {
+    html! {
+        td {  // Started
+            @match game.state {
+                GameState::NotStarted => { "-" }
+                GameState::InProgress | GameState::Paused | GameState::Finished => {
+                    (game.start_time_as_digital())
+                }
+            }
         }
-        GameState::InProgress | GameState::Paused | GameState::Finished => {
-            columns.push(game.start_time_as_digital());
+        td {  // End
+            @match game.state {
+                GameState::NotStarted | GameState::InProgress | GameState::Paused => { "-" }
+                GameState::Finished => { (game.end_time_as_digital()) }
+            }
         }
-    }
-
-    // End
-    match game.state {
-        GameState::NotStarted | GameState::InProgress | GameState::Paused => {
-            columns.push(ph.clone());
+        td {  // Total
+            @match game.state {
+                GameState::NotStarted => { "-" }
+                GameState::InProgress | GameState::Paused | GameState::Finished => {
+                    (game.total_duration())
+                }
+            }
         }
-        GameState::Finished => {
-            columns.push(game.end_time_as_digital());
+        td {  // Current
+            @match game.state {
+                GameState::NotStarted => { "-" }
+                GameState::InProgress => { (game.current_period_duration()) }
+                GameState::Paused | GameState::Finished => { "0s" }
+            }
         }
-    }
-    // Total
-    match game.state {
-        GameState::NotStarted => {
-            columns.push(ph.clone());
+        td {  // Period
+            (game.periods.len().to_string())
         }
-        GameState::InProgress | GameState::Paused | GameState::Finished => {
-            columns.push(game.total_duration());
-        }
-    }
-    // Current
-    match game.state {
-        GameState::NotStarted => {
-            columns.push(ph.clone());
-        }
-        GameState::InProgress => {
-            columns.push(game.current_period_duration());
-        }
-        GameState::Paused | GameState::Finished => {
-            columns.push("0s".to_string());
-        }
-    }
-
-    // Period
-    columns.push(game.periods.len().to_string());
-
-    // MVP
-    columns.push(
-        game.mvp
-            .and_then(|pid| {
-                game.players
-                    .iter()
-                    .find(|p| p.id == pid)
-                    .map(|p| p.name.clone())
+        td {  // MVP
+            ({
+                game.mvp
+                    .and_then(|pid| {
+                        game.players.iter().find(|p| p.id == pid).map(|p| p.name.clone())
+                    })
+                    .unwrap_or_else(|| "-".to_string())
             })
-            .unwrap_or_else(|| ph.clone()),
-    );
-
-    // Return
-    columns
-        .iter()
-        .map(|v| format!("<td>{}</td>", v))
-        .collect::<Vec<String>>()
-        .concat()
+        }
+    }
 }
 
 fn game_action_table(rows: Vec<Markup>) -> Markup {
@@ -152,34 +127,38 @@ pub fn game_action_table_row(game: &GameView) -> Markup {
     html! {
         tr {
             td { (game.id) }
-            td { // Started
+            td {  // Started
                 @match game.state {
                     GameState::NotStarted => {
-                        button class="primary small small-elevate"
+                        button
+                            class="primary small small-elevate"
                             type="button"
                             hx-post={ (base_path) "start" }
                             hx-target="#game"
-                            hx-swap="outerHTML" { (play_svg()) }
+                            hx-swap="outerHTML"
+                        { (play_svg()) }
                     }
                     GameState::InProgress | GameState::Paused | GameState::Finished => {
                         (game.start_time_as_digital())
                     }
                 }
             }
-            td { // End
+            td {  // End
                 @match game.state {
                     GameState::NotStarted => { "-" }
                     GameState::InProgress | GameState::Paused => {
-                        button class="primary small small-elevate error"
+                        button
+                            class="primary small small-elevate error"
                             type="button"
                             hx-post={ (base_path) "end" }
                             hx-target="#game"
-                            hx-swap="outerHTML" { (stop_svg()) }
+                            hx-swap="outerHTML"
+                        { (stop_svg()) }
                     }
                     GameState::Finished => { (game.end_time_as_digital()) }
                 }
             }
-            td { // Total
+            td {  // Total
                 @match game.state {
                     GameState::NotStarted => { "-" }
                     GameState::InProgress | GameState::Paused | GameState::Finished => {
@@ -187,28 +166,32 @@ pub fn game_action_table_row(game: &GameView) -> Markup {
                     }
                 }
             }
-            td { // Current
+            td {  // Current
                 @match game.state {
                     GameState::NotStarted => { "-" }
                     GameState::InProgress => { (game.current_period_duration()) }
                     GameState::Paused | GameState::Finished => { "0s" }
                 }
             }
-            td { // Period
+            td {  // Period
                 @match game.state {
                     GameState::InProgress => {
-                        button class="primary small small-elevate error"
+                        button
+                            class="primary small small-elevate error"
                             type="button"
                             hx-post={ (base_path) "end-period" }
                             hx-target="#game"
-                            hx-swap="outerHTML"  { (stop_svg()) }
+                            hx-swap="outerHTML"
+                        { (stop_svg()) }
                     }
                     GameState::Paused => {
-                        button class="primary small small-elevate"
+                        button
+                            class="primary small small-elevate"
                             type="button"
                             hx-post={ (base_path) "start-period" }
                             hx-target="#game"
-                            hx-swap="outerHTML"  { (play_svg()) }
+                            hx-swap="outerHTML"
+                        { (play_svg()) }
                     }
                     GameState::NotStarted | GameState::Finished => { (game.periods.len()) }
                 }

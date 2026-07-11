@@ -2,8 +2,7 @@ use maud::{Markup, html};
 
 pub fn play_svg() -> Markup {
     html! {
-        svg
-            xmlns="http://www.w3.org/2000/svg"
+        svg xmlns="http://www.w3.org/2000/svg"
             width="16"
             height="16"
             fill="currentColor"
@@ -18,8 +17,7 @@ pub fn play_svg() -> Markup {
 
 pub fn pause_svg() -> Markup {
     html! {
-        svg
-            xmlns="http://www.w3.org/2000/svg"
+        svg xmlns="http://www.w3.org/2000/svg"
             width="16"
             height="16"
             fill="currentColor"
@@ -34,8 +32,7 @@ pub fn pause_svg() -> Markup {
 
 pub fn stop_svg() -> Markup {
     html! {
-        svg
-            xmlns="http://www.w3.org/2000/svg"
+        svg xmlns="http://www.w3.org/2000/svg"
             width="16"
             height="16"
             fill="currentColor"

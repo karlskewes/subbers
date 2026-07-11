@@ -169,30 +169,27 @@ pub fn player_actions_table_row(
 
 fn sub_button(game_id: &u32, game_state: &GameState, player_id: &u32, playing: bool) -> Markup {
     let base_path = format!("/games/{}/players/{}/", game_id, player_id);
-    // maudfmt panics on @match with | so use rusts match versus maud's @match.
-    match game_state {
-        GameState::NotStarted | GameState::Paused | GameState::Finished => html! {
-            "-"
-        },
-        GameState::InProgress => match playing {
-            true => html! {
-                button
-                    class="primary small small-elevate error"
-                    type="button"
-                    hx-post={ (base_path) "sub-off" }
-                    hx-target="closest tr"
-                    hx-swap="outerHTML"
-                { (pause_svg()) }
-            },
-            false => html! {
-                button
-                    class="primary small small-elevate"
-                    type="button"
-                    hx-post={ (base_path) "sub-on" }
-                    hx-target="closest tr"
-                    hx-swap="outerHTML"
-                { (play_svg()) }
-            },
-        },
+    html! {
+        @match game_state {
+            GameState::NotStarted | GameState::Paused | GameState::Finished => "-",
+            GameState::InProgress => {
+                @match playing {
+                    true => button
+                        class="primary small small-elevate error"
+                        type="button"
+                        hx-post={ (base_path) "sub-off" }
+                        hx-target="closest tr"
+                        hx-swap="outerHTML"
+                    { (pause_svg()) },
+                    false => button
+                        class="primary small small-elevate"
+                        type="button"
+                        hx-post={ (base_path) "sub-on" }
+                        hx-target="closest tr"
+                        hx-swap="outerHTML"
+                    { (play_svg()) },
+                }
+            }
+        }
     }
 }
