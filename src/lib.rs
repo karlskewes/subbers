@@ -9,10 +9,10 @@ pub mod svc;
 pub use self::error::{Error, ErrorKind};
 pub use self::game::GameView;
 pub use self::game::{Event, EventError};
-pub use self::game::{Game, GameState, into_game_views};
+pub use self::game::{Game, GameId, GameState, into_game_views};
 pub use self::http::{AxumApp, User};
 use self::metrics::AxumMetricsApp;
-pub use self::player::{Player, PlayerView, into_player_views};
+pub use self::player::{JerseyNumber, Player, PlayerId, PlayerView, into_player_views};
 pub use self::repo::{InMemoryRepo, Repo, SqliteRepo};
 pub use self::svc::Service;
 

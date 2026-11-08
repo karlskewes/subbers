@@ -1,7 +1,7 @@
 use super::Repo;
-use crate::Game;
-use crate::Player;
-use crate::{Error, ErrorKind};
+use crate::{Error, ErrorKind, JerseyNumber};
+use crate::{Game, GameId};
+use crate::{Player, PlayerId};
 
 use std::cmp::Reverse;
 use std::{
@@ -11,8 +11,8 @@ use std::{
 
 #[derive(Default)]
 pub struct InMemoryRepo {
-    games: Arc<RwLock<HashMap<u32, Game>>>,     // TODO: Arc<Game>
-    players: Arc<RwLock<HashMap<u32, Player>>>, // TODO: Arc<Player>
+    games: Arc<RwLock<HashMap<GameId, Game>>>, // TODO: Arc<Game>
+    players: Arc<RwLock<HashMap<PlayerId, Player>>>, // TODO: Arc<Player>
 }
 
 /// `InMemoryRepo` provides an in-memory `Repo` implementation using hash map for storage and
@@ -48,14 +48,16 @@ impl Repo for InMemoryRepo {
         Ok(players)
     }
 
-    fn create_player(&self, number: u32, name: String) -> Result<Player, Error> {
+    fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error> {
         let mut store = self
             .players
             .write()
             .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
-        let id: u32 = u32::try_from(store.len())
-            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
+        let id = PlayerId(
+            u32::try_from(store.len())
+                .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?,
+        );
 
         if store.contains_key(&id) {
             return Err(Error::new(ErrorKind::Conflict));
@@ -68,7 +70,7 @@ impl Repo for InMemoryRepo {
         Ok(player)
     }
 
-    fn get_player(&self, player_id: &u32) -> Result<Player, Error> {
+    fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error> {
         let store = self
             .players
             .read()
@@ -86,17 +88,17 @@ impl Repo for InMemoryRepo {
                 .write()
                 .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
-            if !store.contains_key(&player.number) {
+            if !store.contains_key(&player.id) {
                 return Err(Error::new(ErrorKind::NotFound));
             }
 
-            _ = store.insert(player.number, player);
+            _ = store.insert(player.id, player);
         }
 
         Ok(())
     }
 
-    fn delete_player(&self, player_id: &u32) -> Result<(), Error> {
+    fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error> {
         let mut store = self
             .players
             .write()
@@ -123,7 +125,7 @@ impl Repo for InMemoryRepo {
             .map_err(|e| Error::new(ErrorKind::Internal).with_source_str(e.to_string()))?;
 
         let mut games: Vec<Game> = store.values().cloned().collect();
-        games.sort_by_key(|g| Reverse(g.id)); // Descending (newest).
+        games.sort_by_key(|g| Reverse(g.id.0)); // Descending (newest).
         Ok(games)
     }
 
@@ -144,7 +146,7 @@ impl Repo for InMemoryRepo {
         Ok(())
     }
 
-    fn get_game(&self, game_id: &u32) -> Result<Game, Error> {
+    fn get_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let store = self
             .games
             .read()
@@ -172,7 +174,7 @@ impl Repo for InMemoryRepo {
         Ok(())
     }
 
-    fn delete_game(&self, game_id: &u32) -> Result<(), Error> {
+    fn delete_game(&self, game_id: &GameId) -> Result<(), Error> {
         let mut store = self
             .games
             .write()

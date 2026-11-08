@@ -1,4 +1,4 @@
-use crate::player::Player;
+use crate::player::{Player, PlayerId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ pub struct Period {
 pub struct Data {
     pub periods: Vec<Period>,
     pub players: Vec<Player>,
-    pub mvp: Option<u32>, // player_id
+    pub mvp: Option<PlayerId>, // player_id
 }
 
 impl Period {

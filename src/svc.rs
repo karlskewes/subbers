@@ -1,9 +1,9 @@
 //! `Svc` contains the main `Service` struct, which can be interacted with to manage sports games.
 
-use super::Player;
 use super::Repo;
 use super::{Error, ErrorKind};
-use super::{EventError, Game};
+use super::{EventError, Game, GameId};
+use super::{JerseyNumber, Player, PlayerId};
 use std::sync::Arc;
 
 /// `Service` provides `Game` and `Player` management services, storing data in its repository.
@@ -21,12 +21,12 @@ impl Service {
         self.repo.list_players()
     }
 
-    pub fn create_player(&self, number: u32, name: String) -> Result<Player, Error> {
+    pub fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error> {
         let player = self.repo.create_player(number, name)?;
         Ok(player)
     }
 
-    pub fn get_player(&self, player_id: &u32) -> Result<Player, Error> {
+    pub fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error> {
         self.repo.get_player(player_id)
     }
 
@@ -35,7 +35,7 @@ impl Service {
         self.repo.update_player(player.clone()).map(|()| player)
     }
 
-    pub fn delete_player(&self, player_id: &u32) -> Result<(), Error> {
+    pub fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error> {
         self.repo.delete_player(player_id)
     }
 
@@ -52,18 +52,18 @@ impl Service {
             .map(|p| p.reset_stats()) // zero game stats for new game.
             .collect();
 
-        let game = Game::new(next as u32, players);
+        let game = Game::new(GameId(next as u32), players);
 
         self.repo.create_game(game.clone())?;
 
         Ok(game)
     }
 
-    pub fn get_game(&self, game_id: &u32) -> Result<Game, Error> {
+    pub fn get_game(&self, game_id: &GameId) -> Result<Game, Error> {
         self.repo.get_game(game_id)
     }
 
-    pub fn start_game(&self, game_id: &u32) -> Result<Game, Error> {
+    pub fn start_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let game = self
             .repo
             .get_game(game_id)?
@@ -82,7 +82,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn end_game(&self, game_id: &u32) -> Result<Game, Error> {
+    pub fn end_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let mut game = self
             .repo
             .get_game(game_id)?
@@ -113,7 +113,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn start_game_period(&self, game_id: &u32) -> Result<Game, Error> {
+    pub fn start_game_period(&self, game_id: &GameId) -> Result<Game, Error> {
         let game = self
             .repo
             .get_game(game_id)?
@@ -132,7 +132,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn end_game_period(&self, game_id: &u32) -> Result<Game, Error> {
+    pub fn end_game_period(&self, game_id: &GameId) -> Result<Game, Error> {
         let mut game = self
             .repo
             .get_game(game_id)?
@@ -155,7 +155,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn sub_player_on(&self, game_id: &u32, player_id: &u32) -> Result<Game, Error> {
+    pub fn sub_player_on(&self, game_id: &GameId, player_id: &PlayerId) -> Result<Game, Error> {
         let mut game = self.repo.get_game(game_id)?;
         let player = game
             .shared
@@ -170,7 +170,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn sub_player_off(&self, game_id: &u32, player_id: &u32) -> Result<Game, Error> {
+    pub fn sub_player_off(&self, game_id: &GameId, player_id: &PlayerId) -> Result<Game, Error> {
         let mut game = self.repo.get_game(game_id)?;
         let player = game
             .shared
@@ -185,7 +185,7 @@ impl Service {
         Ok(game)
     }
 
-    pub fn upsert_mvp(&self, game_id: &u32, player_id: &u32) -> Result<Game, Error> {
+    pub fn upsert_mvp(&self, game_id: &GameId, player_id: &PlayerId) -> Result<Game, Error> {
         let mut game = self.repo.get_game(game_id)?;
         game.shared
             .players

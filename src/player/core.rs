@@ -1,19 +1,84 @@
+use std::str::FromStr;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
+
+use crate::{Error, ErrorKind};
+
+/// PlayerId represents the players id.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct PlayerId(pub u32);
+
+impl std::fmt::Display for PlayerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+enum JerseyNumberRepr {
+    DoubleZero,
+    Number(u8),
+}
+
+/// JerseyNumber represents the players jersey number.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+pub struct JerseyNumber(JerseyNumberRepr);
+
+impl std::fmt::Display for JerseyNumber {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            JerseyNumberRepr::DoubleZero => write!(f, "00"),
+            JerseyNumberRepr::Number(v) => write!(f, "{v}"),
+        }
+    }
+}
+
+impl JerseyNumber {
+    pub fn new(s: &str) -> Result<JerseyNumber, Error> {
+        JerseyNumber::from_str(s)
+    }
+}
+
+impl std::str::FromStr for JerseyNumber {
+    type Err = crate::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let repr = if s == "00" {
+            Ok(JerseyNumberRepr::DoubleZero)
+        } else {
+            s.parse::<u8>().map_or_else(
+                |e| Err(Error::new(ErrorKind::InvalidInput(e.to_string()))),
+                |v| {
+                    if v < 100 {
+                        Ok(JerseyNumberRepr::Number(v))
+                    } else {
+                        Err(Error::new(ErrorKind::InvalidInput(
+                            "jersey number must be between 0 and 99 inclusive, got: {v}"
+                                .to_string(),
+                        )))
+                    }
+                },
+            )
+        }?;
+
+        Ok(JerseyNumber(repr))
+    }
+}
 
 /// `Player` represents each participant in the team being managed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Player {
-    pub id: u32,
+    pub id: PlayerId,
     pub name: String,
-    pub number: u32,
+    pub number: JerseyNumber,
     pub play_count: u32,
     pub play_start_time: Option<DateTime<Utc>>,
     pub play_duration: Duration,
 }
 
 impl Player {
-    pub const fn new(id: u32, number: u32, name: String) -> Self {
+    pub const fn new(id: PlayerId, number: JerseyNumber, name: String) -> Self {
         Self {
             id,
             name,

@@ -2,10 +2,11 @@ use chrono::Duration;
 use rusqlite::Connection;
 
 use super::Repo;
-use crate::Player;
-use crate::game::{Data, Game, State};
+use crate::game::{Data, Game, GameId, State};
 use crate::{Error, ErrorKind};
+use crate::{JerseyNumber, Player, PlayerId};
 
+use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // Convert from an owned `Game`, avoiding clone in caller.
@@ -29,7 +30,7 @@ pub struct SqliteRepo {
 // GameSqlRow is a convenience transport struct for holding the Game data going in and out of
 // Sqlite and does not enforce that the contained fields are valid Game fields.
 struct GameSqlRow {
-    id: u32,
+    id: GameId,
     shared_json: String,
     state_json: String,
 }
@@ -70,30 +71,38 @@ impl TryFrom<GameSqlRow> for Game {
 }
 
 struct PlayerSqlRow {
-    id: u32,
+    id: PlayerId,
     name: String,
-    number: u32,
+    number: String,
     play_count: u32,
     play_start_time: Option<i64>,
     play_duration: Option<i64>,
 }
 
-impl From<PlayerSqlRow> for Player {
-    fn from(row: PlayerSqlRow) -> Self {
+impl TryFrom<PlayerSqlRow> for Player {
+    type Error = Error;
+
+    fn try_from(row: PlayerSqlRow) -> Result<Self, Self::Error> {
         let pd = row.play_duration.map_or(Duration::zero(), |d| {
-            chrono::TimeDelta::try_milliseconds(d).map_or(Duration::zero(), |d| d)
+            chrono::TimeDelta::try_milliseconds(d).unwrap_or(Duration::zero())
         });
 
-        Player {
+        let number = JerseyNumber::from_str(&row.number).map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context(format!("player id: {} number: {}", row.id, row.number))
+                .with_source(e)
+        })?;
+
+        Ok(Player {
             id: row.id,
             name: row.name,
-            number: row.number,
+            number,
             play_count: row.play_count,
             play_start_time: row
                 .play_start_time
                 .map_or_else(|| None, chrono::DateTime::from_timestamp_millis),
             play_duration: pd,
-        }
+        })
     }
 }
 
@@ -103,7 +112,7 @@ impl From<Player> for PlayerSqlRow {
         PlayerSqlRow {
             id: player.id,
             name: player.name,
-            number: player.number,
+            number: player.number.to_string(),
             play_count: player.play_count,
             play_start_time: pst,
             play_duration: Some(player.play_duration.num_milliseconds()),
@@ -137,7 +146,7 @@ impl SqliteRepo {
             CREATE TABLE IF NOT EXISTS player (
                 id              INTEGER PRIMARY KEY,
                 name            TEXT NOT NULL,
-                number          INTEGER NOT NULL,
+                number          TEXT NOT NULL,
                 play_count      INTEGER NOT NULL DEFAULT 0,
                 play_start_time INTEGER, -- unix timestamp milliseconds
                 play_duration   INTEGER NOT NULL DEFAULT 0 -- milliseconds
@@ -183,24 +192,26 @@ impl Repo for SqliteRepo {
 
         let players = stmt
             .query_map([], |row| {
-                let sql_row = PlayerSqlRow {
-                    id: row.get(0)?,
+                Ok(PlayerSqlRow {
+                    id: PlayerId(row.get(0)?),
                     name: row.get(1)?,
                     number: row.get(2)?,
                     play_count: row.get(3)?,
                     play_start_time: row.get(4)?,
                     play_duration: row.get(5)?,
-                };
-
-                Ok(Player::from(sql_row))
+                })
             })
             .map_err(Error::from)?
+            .map(|row| {
+                let sql_row = row.map_err(Error::from)?;
+                Player::try_from(sql_row)
+            })
             .collect::<Result<Vec<Player>, _>>()?;
 
         Ok(players)
     }
 
-    fn create_player(&self, number: u32, name: String) -> Result<Player, Error> {
+    fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -215,25 +226,23 @@ impl Repo for SqliteRepo {
             ",
         )?;
 
-        let player = stmt
-            .query_one((name.clone(), &number), |row| {
-                let sql_row = PlayerSqlRow {
-                    id: row.get(0)?,
+        let row = stmt
+            .query_one((name.clone(), number.to_string()), |row| {
+                Ok(PlayerSqlRow {
+                    id: PlayerId(row.get(0)?),
                     name,
-                    number,
+                    number: number.to_string(),
                     play_count: 0,
                     play_start_time: None,
                     play_duration: None,
-                };
-
-                Ok(Player::from(sql_row))
+                })
             })
             .map_err(Error::from)?;
 
-        Ok(player)
+        Player::try_from(row)
     }
 
-    fn get_player(&self, player_id: &u32) -> Result<Player, Error> {
+    fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -252,22 +261,20 @@ impl Repo for SqliteRepo {
         ",
         )?;
 
-        let player = stmt
-            .query_one([player_id], |row| {
-                let sql_row = PlayerSqlRow {
-                    id: row.get(0)?,
+        let row = stmt
+            .query_one([player_id.0], |row| {
+                Ok(PlayerSqlRow {
+                    id: PlayerId(row.get(0)?),
                     name: row.get(1)?,
                     number: row.get(2)?,
                     play_count: row.get(3)?,
                     play_start_time: row.get(4)?,
                     play_duration: row.get(5)?,
-                };
-
-                Ok(Player::from(sql_row))
+                })
             })
             .map_err(Error::from)?;
 
-        Ok(player)
+        Player::try_from(row)
     }
 
     fn update_player(&self, player: Player) -> Result<(), Error> {
@@ -293,11 +300,11 @@ impl Repo for SqliteRepo {
         let result = stmt
             .execute((
                 row.name,
-                row.number,
+                row.number.to_string(),
                 row.play_count,
                 row.play_start_time,
                 row.play_duration,
-                row.id,
+                row.id.0,
             ))
             .map_err(Error::from)?;
 
@@ -309,7 +316,7 @@ impl Repo for SqliteRepo {
         }
     }
 
-    fn delete_player(&self, player_id: &u32) -> Result<(), Error> {
+    fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -321,7 +328,7 @@ impl Repo for SqliteRepo {
             ",
         )?;
 
-        let result = stmt.execute([player_id]).map_err(Error::from)?;
+        let result = stmt.execute([player_id.0]).map_err(Error::from)?;
 
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),
@@ -360,7 +367,7 @@ impl Repo for SqliteRepo {
         let games = stmt
             .query_map([], |row| {
                 Ok(GameSqlRow {
-                    id: row.get(0)?,
+                    id: GameId(row.get(0)?),
                     shared_json: row.get(1)?,
                     state_json: row.get(2)?,
                 })
@@ -388,14 +395,14 @@ impl Repo for SqliteRepo {
             VALUES
                 (?1, ?2, ?3)
             ",
-            (&row.id, &row.shared_json, row.state_json),
+            (&row.id.0, &row.shared_json, row.state_json),
         )
         .map_err(Error::from)?;
 
         Ok(())
     }
 
-    fn get_game(&self, game_id: &u32) -> Result<Game, Error> {
+    fn get_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -412,9 +419,9 @@ impl Repo for SqliteRepo {
         )?;
 
         let row = stmt
-            .query_one([game_id], |row| {
+            .query_one([game_id.0], |row| {
                 Ok(GameSqlRow {
-                    id: row.get(0)?,
+                    id: GameId(row.get(0)?),
                     shared_json: row.get(1)?,
                     state_json: row.get(2)?,
                 })
@@ -442,7 +449,7 @@ impl Repo for SqliteRepo {
         let row = GameSqlRow::try_from(game)?;
 
         let result = stmt
-            .execute((row.id, row.shared_json, row.state_json))
+            .execute((row.id.0, row.shared_json, row.state_json))
             .map_err(Error::from)?;
 
         match result {
@@ -453,7 +460,7 @@ impl Repo for SqliteRepo {
         }
     }
 
-    fn delete_game(&self, game_id: &u32) -> Result<(), Error> {
+    fn delete_game(&self, game_id: &GameId) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
         let mut stmt = conn.prepare(
@@ -465,7 +472,7 @@ impl Repo for SqliteRepo {
             ",
         )?;
 
-        let result = stmt.execute([game_id]).map_err(Error::from)?;
+        let result = stmt.execute([game_id.0]).map_err(Error::from)?;
 
         match result {
             0 => Err(Error::new(ErrorKind::NotFound)),

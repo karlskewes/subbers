@@ -4,5 +4,5 @@ mod core;
 mod view;
 
 // re-export some objects to reduce use import stuttering.
-pub use core::Player;
+pub use core::{JerseyNumber, Player, PlayerId};
 pub use view::{PlayerView, into_player_views};

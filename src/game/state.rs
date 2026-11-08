@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// with compile time safety enforced by GamePhase marker structs.
 // A simple enum and some judicious match statements would have been simpler and enough for this
 // simple app.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum State {
     NotStarted(GamePhase<NotStartedState>),
     InProgress(GamePhase<InProgressState>),
@@ -14,6 +14,7 @@ pub enum State {
     Finished(GamePhase<FinishedState>),
 }
 
+#[derive(Debug)]
 pub enum GameState {
     NotStarted,
     InProgress,
@@ -32,18 +33,18 @@ impl State {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NotStartedState {}
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InProgressState {
     pub start_time: DateTime<Utc>,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PausedState {
     pub start_time: DateTime<Utc>,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FinishedState {
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
@@ -51,7 +52,7 @@ pub struct FinishedState {
 
 /// `GamePhase` is a marker struct representing the phase or state a game is in and enforces
 /// compile time safety of phase/state transitions.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GamePhase<S> {
     pub state: S,
 }

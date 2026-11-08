@@ -1,5 +1,5 @@
 use super::icon_templates::{play_svg, stop_svg};
-use crate::{GameState, GameView, PlayerView};
+use crate::{GameId, GameState, GameView, PlayerId, PlayerView};
 use maud::{Markup, html};
 
 pub fn list_games(games: &[GameView]) -> Markup {
@@ -203,7 +203,7 @@ pub fn game_action_table_row(game: &GameView) -> Markup {
     }
 }
 
-fn mvp_select(game_id: u32, players: &Vec<PlayerView>, mvp: Option<u32>) -> Markup {
+fn mvp_select(game_id: GameId, players: &Vec<PlayerView>, mvp: Option<PlayerId>) -> Markup {
     let base_path = format!("/games/{}/mvp", game_id);
     let mvp_set = mvp.is_some();
     html! {

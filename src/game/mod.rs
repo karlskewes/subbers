@@ -7,7 +7,7 @@ mod state;
 mod view;
 
 // re-export some objects to reduce use import stuttering.
-pub use core::Game;
+pub use core::{Game, GameId};
 pub use data::Data;
 pub use event::{Event, EventError};
 pub use state::GameState;

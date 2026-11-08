@@ -1,4 +1,4 @@
-use super::core::Player;
+use super::core::{Player, PlayerId};
 use chrono::{DateTime, Duration, TimeDelta, Utc};
 
 fn duration(delta: TimeDelta) -> String {
@@ -11,9 +11,10 @@ fn duration(delta: TimeDelta) -> String {
 
 /// `PlayerView` is a read-only view of a `Player` with useful data provided as struct fields and via
 /// helper methods. It is intended for use in HTML and other presentation layers.
+#[derive(Debug)]
 pub struct PlayerView {
-    pub id: u32,
-    pub number: u32,
+    pub id: PlayerId,
+    pub number: String,
     pub name: String,
     pub play_count: u32,
     pub playing: bool,
@@ -52,7 +53,7 @@ impl From<&Player> for PlayerView {
     fn from(player: &Player) -> PlayerView {
         Self {
             id: player.id,
-            number: player.number,
+            number: player.number.to_string(),
             name: player.name.clone(),
             play_count: player.play_count,
             play_duration: player.play_duration,

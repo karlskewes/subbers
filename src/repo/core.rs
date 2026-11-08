@@ -2,8 +2,8 @@
 //! `Repo` also contains the different concrete data store implementations.
 
 use crate::Error;
-use crate::Game;
-use crate::Player;
+use crate::{Game, GameId};
+use crate::{JerseyNumber, Player, PlayerId};
 
 /// `Repo` describes the methods required for a Service repository.
 pub trait Repo: Send + Sync {
@@ -21,12 +21,12 @@ pub trait Repo: Send + Sync {
     ///
     /// `Error` will be returned when a value can't be found or there was an
     /// internal error processing the request.
-    fn create_player(&self, number: u32, name: String) -> Result<Player, Error>;
+    fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error>;
     /// # Errors
     ///
     /// `Error` will be returned when a value can't be found or there was an
     /// internal error processing the request.
-    fn get_player(&self, player_id: &u32) -> Result<Player, Error>;
+    fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error>;
     /// # Errors
     ///
     /// `Error` will be returned when a value can't be found or there was an
@@ -36,7 +36,7 @@ pub trait Repo: Send + Sync {
     ///
     /// `Error` will be returned when a value can't be found or there was an
     /// internal error processing the request.
-    fn delete_player(&self, player_id: &u32) -> Result<(), Error>;
+    fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error>;
     /// # Errors
     ///
     /// `Error` will be returned when a value can't be found or there was an
@@ -56,7 +56,7 @@ pub trait Repo: Send + Sync {
     ///
     /// `Error` will be returned when a value can't be found or there was an
     /// internal error processing the request.
-    fn get_game(&self, game_id: &u32) -> Result<Game, Error>;
+    fn get_game(&self, game_id: &GameId) -> Result<Game, Error>;
     /// # Errors
     ///
     /// `Error` will be returned when a value can't be found or there was an
@@ -66,5 +66,5 @@ pub trait Repo: Send + Sync {
     ///
     /// `Error` will be returned when a value can't be found or there was an
     /// internal error processing the request.
-    fn delete_game(&self, game_id: &u32) -> Result<(), Error>;
+    fn delete_game(&self, game_id: &GameId) -> Result<(), Error>;
 }

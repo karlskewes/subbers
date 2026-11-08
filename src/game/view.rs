@@ -1,7 +1,10 @@
-use super::core::Game;
+use super::core::{Game, GameId};
 use super::data::Period;
 use super::state::GameState;
-use crate::player::{PlayerView, into_player_views};
+use crate::{
+    PlayerId,
+    player::{PlayerView, into_player_views},
+};
 use chrono::{DateTime, TimeDelta, Utc};
 
 const TIME_FORMAT_DIGITAL: &str = "%H:%M:%S";
@@ -21,15 +24,16 @@ fn duration(delta: TimeDelta) -> String {
 
 /// `GameView` is a read-only view of a `Game` with useful data provided as struct fields and via
 /// helper methods. It is intended for use in HTML and other presentation layers.
+#[derive(Debug)]
 pub struct GameView {
-    pub id: u32,
+    pub id: GameId,
     // consider Option<string> for easier consumption
     pub start_time: Option<DateTime<Utc>>,
     pub end_time: Option<DateTime<Utc>>,
     pub state: GameState,
     pub periods: Vec<Period>,
     pub players: Vec<PlayerView>,
-    pub mvp: Option<u32>,
+    pub mvp: Option<PlayerId>,
 }
 
 impl GameView {

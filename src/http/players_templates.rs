@@ -1,5 +1,5 @@
 use super::icon_templates::{pause_svg, play_svg};
-use crate::{GameState, PlayerView};
+use crate::{GameId, GameState, PlayerId, PlayerView};
 use maud::{Markup, html};
 
 pub fn list_players(players: &[PlayerView]) -> Markup {
@@ -120,7 +120,7 @@ pub fn player_edit_table_row(player: &PlayerView) -> Markup {
     }
 }
 
-pub fn player_actions(game_id: &u32, game_state: &GameState, players: &[PlayerView]) -> Markup {
+pub fn player_actions(game_id: &GameId, game_state: &GameState, players: &[PlayerView]) -> Markup {
     let rows: Vec<Markup> = players
         .iter()
         .map(|p| player_actions_table_row(game_id, game_state, p))
@@ -151,7 +151,7 @@ fn player_actions_table(rows: Vec<Markup>) -> Markup {
 }
 
 pub fn player_actions_table_row(
-    game_id: &u32,
+    game_id: &GameId,
     game_state: &GameState,
     player: &PlayerView,
 ) -> Markup {
@@ -167,7 +167,12 @@ pub fn player_actions_table_row(
     }
 }
 
-fn sub_button(game_id: &u32, game_state: &GameState, player_id: &u32, playing: bool) -> Markup {
+fn sub_button(
+    game_id: &GameId,
+    game_state: &GameState,
+    player_id: &PlayerId,
+    playing: bool,
+) -> Markup {
     let base_path = format!("/games/{}/players/{}/", game_id, player_id);
     html! {
         @match game_state {
