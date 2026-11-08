@@ -19,11 +19,14 @@ pub use self::svc::Service;
 use clap::Parser;
 use std::sync::Arc;
 use tokio::signal;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    Layer, Registry, fmt, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt,
+};
 
 const SQLITE_FILEPATH: &str = "subbers.sql";
 const LISTEN_ADDR: &str = "0.0.0.0:8080";
 const METRICS_LISTEN_ADDR: &str = "0.0.0.0:8081";
+const LOG_FORMAT: &str = "compact";
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -40,6 +43,10 @@ struct CLIArgs {
     #[arg(short, long, default_value = METRICS_LISTEN_ADDR)]
     metrics_listen_addr: String,
 
+    /// Log format: compact, json, pretty
+    #[arg(long, default_value = LOG_FORMAT)]
+    log_format: String,
+
     /// Basic Auth 'user:pass' for HTTP server
     #[arg(short, long)]
     basic_auth: Option<String>,
@@ -48,6 +55,12 @@ struct CLIArgs {
 pub enum RepoConfig {
     Sqlite(Option<std::path::PathBuf>),
     InMemory,
+}
+
+enum LogFormat {
+    Compact,
+    Json,
+    Pretty,
 }
 
 impl Default for RepoConfig {
@@ -60,6 +73,7 @@ pub struct Config {
     repo_config: RepoConfig,
     listen_addr: String,
     metrics_listen_addr: String,
+    log_format: LogFormat,
     basic_auth: Option<User>,
     version: String,
 }
@@ -67,9 +81,10 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            repo_config: RepoConfig::default(),
             listen_addr: String::from(LISTEN_ADDR),
             metrics_listen_addr: String::from(METRICS_LISTEN_ADDR),
-            repo_config: RepoConfig::default(),
+            log_format: LogFormat::Compact,
             basic_auth: None,
             version: "devel".to_string(),
         }
@@ -97,6 +112,17 @@ impl Config {
         if !version.is_empty() {
             cfg.version = version.to_string();
         }
+
+        cfg.log_format = match args.log_format.as_str() {
+            "compact" => LogFormat::Compact,
+            "json" => LogFormat::Json,
+            "pretty" => LogFormat::Pretty,
+            _ => {
+                return Err(Error::new(ErrorKind::InvalidInput(
+                    "log-format must be one of 'compact|json|pretty'".to_string(),
+                )));
+            }
+        };
 
         cfg.basic_auth = args
             .basic_auth
@@ -132,14 +158,18 @@ impl Config {
 }
 
 pub async fn run(cfg: Config) -> Result<(), std::io::Error> {
-    // TODO: logfmt or json for local/prod on fmt.json()
-    // TODO: consider this a default, enable passing in.
+    let base = fmt::layer().with_span_events(FmtSpan::CLOSE);
+    let fmt_layer: Box<dyn Layer<Registry> + Send + Sync> = match cfg.log_format {
+        LogFormat::Compact => base.compact().boxed(),
+        LogFormat::Json => base.json().boxed(),
+        LogFormat::Pretty => base.pretty().boxed(),
+    };
     tracing_subscriber::registry()
+        .with(fmt_layer)
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+                .unwrap_or_else(|_| format!("{}=info", env!("CARGO_CRATE_NAME")).into()),
         )
-        .with(tracing_subscriber::fmt::layer())
         .init();
 
     let mut prometheus_registry = metrics::create_registry(cfg.version.clone())?;

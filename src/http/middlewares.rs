@@ -8,7 +8,8 @@ use axum::{
 use base64::prelude::*;
 use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::{counter::Counter, family::Family, histogram::Histogram};
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
+use tower::ServiceBuilder;
 
 #[derive(Clone)]
 pub struct AuthConfig {
@@ -128,7 +129,7 @@ pub async fn track_metrics(
     req: Request,
     next: Next,
 ) -> impl IntoResponse {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     // TODO: improve method matching/enum rather than string?
     let method = req.method().clone();
     let path = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {
@@ -153,4 +154,28 @@ pub async fn track_metrics(
         .observe(latency);
 
     response
+}
+
+pub fn instrument_router(router: axum::Router, metrics: AxumAppMetrics) -> axum::Router {
+    let metrics_layer = axum::middleware::from_fn_with_state(metrics, track_metrics);
+
+    let trace_layer = tower_http::trace::TraceLayer::new_for_http()
+            .make_span_with(|request: &Request<_>| {
+                tracing::info_span!("http_request", method = ?request.method(), "path" = ?request.uri(), status_code = tracing::field::Empty)
+            })
+            .on_response(
+                |response: &Response,
+                 _latency: std::time::Duration,
+                 span: &tracing::Span| {
+                    span.record("status_code", tracing::field::display(response.status()));
+                },
+            )
+            .on_failure(())
+    ;
+
+    router.layer(
+        ServiceBuilder::new()
+            .layer(trace_layer)
+            .layer(metrics_layer),
+    )
 }

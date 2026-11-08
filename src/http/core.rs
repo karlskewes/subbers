@@ -1,7 +1,7 @@
 //! `http` wraps the domain service and provides http endpoints for interacting with the Service.
 
 use super::{games_templates, layout_templates, players_templates};
-use crate::http::middlewares::{AuthConfig, AxumAppMetrics};
+use crate::http::middlewares::{self, AuthConfig, AxumAppMetrics};
 use crate::{
     Error, ErrorKind, GameId, GameView, JerseyNumber, PlayerId, Service, into_game_views,
     into_player_views,
@@ -15,8 +15,6 @@ use axum::{
 };
 use maud::Markup;
 use serde::Deserialize;
-use tower::ServiceBuilder;
-use tower_http::trace::TraceLayer;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -27,7 +25,13 @@ impl IntoResponse for Error {
             ErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
-        let body = self.to_string();
+        let body = self.to_string(); // user message
+
+        // Create error level span instead of Axum's `.on_failure()` default so we can
+        // enrich with custom Error fields.
+        if status.is_server_error() {
+            tracing::error!(status = status.as_u16(), kind = ?self.kind(), context = ?self.context(), location =?self.location(), /*span_trace = %self.span_trace, */"request failed")
+        }
 
         (status, body).into_response()
     }
@@ -77,17 +81,7 @@ impl AxumApp {
 
         let auth_middleware = AuthConfig::new(self.basic_auth).into_middleware();
 
-        // TODO: create .into_middleware() method
-        let metrics_layer = axum::middleware::from_fn_with_state(
-            self.metrics.clone(),
-            crate::http::middlewares::track_metrics,
-        );
-        let trace_layer = TraceLayer::new_for_http();
-        // .make_span_with(trace_layer::trace_layer_make_span_with)
-        // .on_request(trace_layer::trace_layer_on_request)
-        // .on_response(trace_layer::trace_layer_on_response);
-
-        Router::new()
+        let router = Router::new()
             .route("/", get(home))
             .route("/static/{filename}", get(assets))
             // game
@@ -115,15 +109,12 @@ impl AxumApp {
             .route("/players/{player_id}/edit", get(edit_player_form))
             // middlewares
             .route_layer(auth_middleware)
-            .layer(
-                ServiceBuilder::new()
-                    .layer(trace_layer)
-                    .layer(metrics_layer),
-            )
             // state (db, etc)
             .with_state(state)
             // basic auth not required for below routes
-            .route("/ready", get(ready))
+            .route("/ready", get(ready));
+
+        middlewares::instrument_router(router, self.metrics.clone())
     }
 }
 
@@ -148,6 +139,7 @@ async fn ready() -> impl IntoResponse {
     StatusCode::OK
 }
 
+#[tracing::instrument(skip_all)]
 async fn home(State(state): State<AppState>) -> Result<impl IntoResponse, Error> {
     let title = "subbers";
     let description = "Manage your sports game subs";
@@ -163,6 +155,7 @@ async fn home(State(state): State<AppState>) -> Result<impl IntoResponse, Error>
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn get_player(
     State(state): State<AppState>,
     Path(player_id): Path<String>,
@@ -180,6 +173,7 @@ async fn get_player(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn create_player(
     State(state): State<AppState>,
     Form(input): Form<NewPlayerForm>,
@@ -192,6 +186,7 @@ async fn create_player(
     Ok((StatusCode::CREATED, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn edit_player_form(
     State(state): State<AppState>,
     Path(player_id): Path<String>,
@@ -209,6 +204,7 @@ async fn edit_player_form(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn edit_player(
     State(state): State<AppState>,
     Path(player_id): Path<String>,
@@ -232,6 +228,7 @@ async fn edit_player(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn delete_player(
     State(state): State<AppState>,
     Path(player_id): Path<String>,
@@ -248,6 +245,7 @@ async fn delete_player(
     Ok(Redirect::to("/players"))
 }
 
+#[tracing::instrument(skip_all)]
 async fn list_players(State(state): State<AppState>) -> Result<impl IntoResponse, Error> {
     let players = into_player_views(state.svc.list_players()?);
     let body = Html(players_templates::list_players(&players).into_string());
@@ -257,6 +255,7 @@ async fn list_players(State(state): State<AppState>) -> Result<impl IntoResponse
 
 // assets serves files embedded into the application. With 'bacon run' it's not
 // too awkward for development and is simple for deployment.
+#[tracing::instrument(skip_all)]
 async fn assets(Path(filename): Path<String>) -> Result<impl IntoResponse, Error> {
     let (content_type, body) = match filename.as_str() {
         "beer_3.11.33.min.css" => (
@@ -282,6 +281,7 @@ async fn assets(Path(filename): Path<String>) -> Result<impl IntoResponse, Error
     Ok(([(header::CONTENT_TYPE, content_type)], body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn create_game(State(state): State<AppState>) -> Result<impl IntoResponse, Error> {
     let game: GameView = state.svc.create_game()?.into();
     let body = Html(games_templates::game_table_row(&game).into_string());
@@ -289,6 +289,7 @@ async fn create_game(State(state): State<AppState>) -> Result<impl IntoResponse,
     Ok((StatusCode::CREATED, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn list_games(State(state): State<AppState>) -> Result<impl IntoResponse, Error> {
     let games = into_game_views(state.svc.list_games()?);
     let body = Html(games_templates::list_games(&games).into_string());
@@ -301,6 +302,7 @@ fn get_game_html(game: GameView) -> Markup {
     games_templates::get_game(&game, player_actions)
 }
 
+#[tracing::instrument(skip_all)]
 async fn get_game(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -329,6 +331,7 @@ async fn get_game(
     Ok((StatusCode::OK, Html(body)))
 }
 
+#[tracing::instrument(skip_all)]
 async fn start_game(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -346,6 +349,7 @@ async fn start_game(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn end_game(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -363,6 +367,7 @@ async fn end_game(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn start_game_period(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -380,6 +385,7 @@ async fn start_game_period(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn end_game_period(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -402,6 +408,7 @@ struct GameMVPForm {
     pub player_id: PlayerId,
 }
 
+#[tracing::instrument(skip_all)]
 async fn upsert_mvp(
     State(state): State<AppState>,
     Path(game_id): Path<String>,
@@ -420,6 +427,7 @@ async fn upsert_mvp(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn sub_player_on(
     State(state): State<AppState>,
     Path((game_id, player_id)): Path<(String, String)>,
@@ -453,6 +461,7 @@ async fn sub_player_on(
     Ok((StatusCode::OK, body))
 }
 
+#[tracing::instrument(skip_all)]
 async fn sub_player_off(
     State(state): State<AppState>,
     Path((game_id, player_id)): Path<(String, String)>,

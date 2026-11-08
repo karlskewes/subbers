@@ -27,6 +27,7 @@ impl InMemoryRepo {
 }
 
 impl Repo for InMemoryRepo {
+    #[tracing::instrument(name = "repo.inmemory.count_players", skip_all)]
     fn count_players(&self) -> Result<usize, Error> {
         let store = self
             .players
@@ -36,6 +37,7 @@ impl Repo for InMemoryRepo {
         Ok(store.len())
     }
 
+    #[tracing::instrument(name = "repo.inmemory.list_players", skip_all)]
     fn list_players(&self) -> Result<Vec<Player>, Error> {
         let store = self
             .players
@@ -48,6 +50,7 @@ impl Repo for InMemoryRepo {
         Ok(players)
     }
 
+    #[tracing::instrument(name = "repo.inmemory.create_player", skip_all)]
     fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error> {
         let mut store = self
             .players
@@ -70,6 +73,7 @@ impl Repo for InMemoryRepo {
         Ok(player)
     }
 
+    #[tracing::instrument(name = "repo.inmemory.get_player", skip_all)]
     fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error> {
         let store = self
             .players
@@ -81,6 +85,7 @@ impl Repo for InMemoryRepo {
             .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |p| Ok(p.clone()))
     }
 
+    #[tracing::instrument(name = "repo.inmemory.update_player", skip_all)]
     fn update_player(&self, player: Player) -> Result<(), Error> {
         {
             let mut store = self
@@ -98,6 +103,7 @@ impl Repo for InMemoryRepo {
         Ok(())
     }
 
+    #[tracing::instrument(name = "repo.inmemory.delete_player", skip_all)]
     fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error> {
         let mut store = self
             .players
@@ -109,6 +115,7 @@ impl Repo for InMemoryRepo {
             .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |_p| Ok(()))
     }
 
+    #[tracing::instrument(name = "repo.inmemory.count_games", skip_all)]
     fn count_games(&self) -> Result<usize, Error> {
         let store = self
             .games
@@ -118,6 +125,7 @@ impl Repo for InMemoryRepo {
         Ok(store.len())
     }
 
+    #[tracing::instrument(name = "repo.inmemory.list_games", skip_all)]
     fn list_games(&self) -> Result<Vec<Game>, Error> {
         let store = self
             .games
@@ -129,6 +137,7 @@ impl Repo for InMemoryRepo {
         Ok(games)
     }
 
+    #[tracing::instrument(name = "repo.inmemory.create_game", skip_all)]
     fn create_game(&self, game: Game) -> Result<(), Error> {
         {
             let mut store = self
@@ -146,6 +155,7 @@ impl Repo for InMemoryRepo {
         Ok(())
     }
 
+    #[tracing::instrument(name = "repo.inmemory.get_game", skip_all)]
     fn get_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let store = self
             .games
@@ -157,6 +167,7 @@ impl Repo for InMemoryRepo {
             .map_or_else(|| Err(Error::new(ErrorKind::NotFound)), |g| Ok(g.clone()))
     }
 
+    #[tracing::instrument(name = "repo.inmemory.update_game", skip_all)]
     fn update_game(&self, game: Game) -> Result<(), Error> {
         {
             let mut store = self
@@ -174,6 +185,7 @@ impl Repo for InMemoryRepo {
         Ok(())
     }
 
+    #[tracing::instrument(name = "repo.inmemory.delete_game", skip_all)]
     fn delete_game(&self, game_id: &GameId) -> Result<(), Error> {
         let mut store = self
             .games

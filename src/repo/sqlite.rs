@@ -174,6 +174,7 @@ impl SqliteRepo {
 }
 
 impl Repo for SqliteRepo {
+    #[tracing::instrument(name = "repo.sqlite.count_players", skip_all)]
     fn count_players(&self) -> Result<usize, Error> {
         let conn = self.get_conn()?;
 
@@ -184,6 +185,7 @@ impl Repo for SqliteRepo {
         Ok(count)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.list_players", skip_all)]
     fn list_players(&self) -> Result<Vec<Player>, Error> {
         let conn = self.get_conn()?;
 
@@ -224,6 +226,7 @@ impl Repo for SqliteRepo {
         Ok(players)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.create_player", skip_all)]
     fn create_player(&self, number: JerseyNumber, name: String) -> Result<Player, Error> {
         let conn = self.get_conn()?;
 
@@ -255,6 +258,7 @@ impl Repo for SqliteRepo {
         Player::try_from(row)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.get_player", skip_all)]
     fn get_player(&self, player_id: &PlayerId) -> Result<Player, Error> {
         let conn = self.get_conn()?;
 
@@ -290,6 +294,7 @@ impl Repo for SqliteRepo {
         Player::try_from(row)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.update_player", skip_all)]
     fn update_player(&self, player: Player) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
@@ -329,6 +334,7 @@ impl Repo for SqliteRepo {
         }
     }
 
+    #[tracing::instrument(name = "repo.sqlite.delete_player", skip_all)]
     fn delete_player(&self, player_id: &PlayerId) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
@@ -351,6 +357,7 @@ impl Repo for SqliteRepo {
         }
     }
 
+    #[tracing::instrument(name = "repo.sqlite.count_games", skip_all)]
     fn count_games(&self) -> Result<usize, Error> {
         let conn = self.get_conn()?;
 
@@ -361,6 +368,7 @@ impl Repo for SqliteRepo {
         Ok(count)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.list_games", skip_all)]
     fn list_games(&self) -> Result<Vec<Game>, Error> {
         let conn = self.get_conn()?;
 
@@ -395,6 +403,7 @@ impl Repo for SqliteRepo {
         Ok(games)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.create_game", skip_all)]
     fn create_game(&self, game: Game) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
@@ -415,6 +424,7 @@ impl Repo for SqliteRepo {
         Ok(())
     }
 
+    #[tracing::instrument(name = "repo.sqlite.get_game", skip_all)]
     fn get_game(&self, game_id: &GameId) -> Result<Game, Error> {
         let conn = self.get_conn()?;
 
@@ -444,6 +454,7 @@ impl Repo for SqliteRepo {
         Game::try_from(row)
     }
 
+    #[tracing::instrument(name = "repo.sqlite.update_game", skip_all)]
     fn update_game(&self, game: Game) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
@@ -473,6 +484,7 @@ impl Repo for SqliteRepo {
         }
     }
 
+    #[tracing::instrument(name = "repo.sqlite.delete_game", skip_all)]
     fn delete_game(&self, game_id: &GameId) -> Result<(), Error> {
         let conn = self.get_conn()?;
 
