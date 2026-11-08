@@ -16,25 +16,28 @@ pub struct Error {
     /// kind is the Error variant.
     kind: ErrorKind,
     /// context contains any operator targeted messaging.
-    context: Option<String>,
+    context: Vec<String>,
     /// source contains any downstream or dependency error that was encountered.
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
 impl Error {
+    /// new creates a new error.
     pub fn new(kind: ErrorKind) -> Self {
         Self {
             kind,
-            context: None,
+            context: vec![],
             source: None,
         }
     }
 
+    /// with_context adds the provided context to any existing error context.
     pub fn with_context(mut self, context: String) -> Self {
-        self.context = Some(context);
+        self.context.push(context);
         self
     }
 
+    /// with_source sets the associated downstream error.
     pub fn with_source<E>(mut self, source: E) -> Self
     where
         E: std::error::Error + Send + Sync + 'static,
@@ -43,13 +46,20 @@ impl Error {
         self
     }
 
+    /// with_source_str sets the associated downstream error from the provided source string.
     pub fn with_source_str(self, source: String) -> Self {
         let s = StringError(source);
         self.with_source(s)
     }
 
+    /// kind returns the error variant.
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
+    }
+
+    /// context returns the error context.
+    pub fn context(&self) -> String {
+        self.context.join("; ")
     }
 }
 
@@ -76,7 +86,7 @@ impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Error")
             .field("kind", &self.kind)
-            .field("context", &self.context)
+            .field("context", &self.context.join("; "))
             .field("source", &self.source)
             .finish()
     }

@@ -9,7 +9,6 @@ use crate::{JerseyNumber, Player, PlayerId};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-// Convert from an owned `Game`, avoiding clone in caller.
 impl From<rusqlite::Error> for Error {
     fn from(re: rusqlite::Error) -> Error {
         match re {
@@ -29,6 +28,7 @@ pub struct SqliteRepo {
 
 // GameSqlRow is a convenience transport struct for holding the Game data going in and out of
 // Sqlite and does not enforce that the contained fields are valid Game fields.
+#[derive(Debug)]
 struct GameSqlRow {
     id: GameId,
     shared_json: String,
@@ -39,10 +39,16 @@ impl TryFrom<Game> for GameSqlRow {
     type Error = Error;
 
     fn try_from(game: Game) -> Result<Self, Self::Error> {
-        let shared_json = serde_json::to_string(&game.shared)
-            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
-        let state_json = serde_json::to_string(&game.state)
-            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
+        let shared_json = serde_json::to_string(&game.shared).map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context(format!("game id: {} json: shared", game.id))
+                .with_source(e)
+        })?;
+        let state_json = serde_json::to_string(&game.state).map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context(format!("game id: {} json: state", game.id))
+                .with_source(e)
+        })?;
 
         Ok(GameSqlRow {
             id: game.id,
@@ -56,11 +62,17 @@ impl TryFrom<GameSqlRow> for Game {
     type Error = Error;
 
     fn try_from(row: GameSqlRow) -> Result<Self, Self::Error> {
-        let shared: Data = serde_json::from_str(&row.shared_json)
-            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
+        let shared: Data = serde_json::from_str(&row.shared_json).map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context(format!("game id: {} json: shared", row.id))
+                .with_source(e)
+        })?;
 
-        let state: State = serde_json::from_str(&row.state_json)
-            .map_err(|e| Error::new(ErrorKind::Internal).with_source(e))?;
+        let state: State = serde_json::from_str(&row.state_json).map_err(|e| {
+            Error::new(ErrorKind::Internal)
+                .with_context(format!("game id: {} json: state", row.id))
+                .with_source(e)
+        })?;
 
         Ok(Game {
             id: row.id,
@@ -70,6 +82,7 @@ impl TryFrom<GameSqlRow> for Game {
     }
 }
 
+#[derive(Debug)]
 struct PlayerSqlRow {
     id: PlayerId,
     name: String,
