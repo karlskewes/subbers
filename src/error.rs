@@ -1,6 +1,7 @@
 //! `error` specifies the domain errors that can occur.
 
 use std::fmt::Formatter;
+use std::panic::Location;
 
 #[derive(Debug)]
 /// ErrorKind listing possible error variations in subbers.
@@ -17,16 +18,20 @@ pub struct Error {
     kind: ErrorKind,
     /// context contains any operator targeted messaging.
     context: Vec<String>,
+    /// location contains the caller.
+    location: &'static Location<'static>,
     /// source contains any downstream or dependency error that was encountered.
     source: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 
 impl Error {
     /// new creates a new error.
+    #[track_caller]
     pub fn new(kind: ErrorKind) -> Self {
         Self {
             kind,
             context: vec![],
+            location: Location::caller(),
             source: None,
         }
     }
@@ -61,6 +66,11 @@ impl Error {
     pub fn context(&self) -> String {
         self.context.join("; ")
     }
+
+    /// location returns the callers location.
+    pub fn location(&self) -> String {
+        self.location.to_string()
+    }
 }
 
 impl std::error::Error for Error {
@@ -87,6 +97,7 @@ impl std::fmt::Debug for Error {
         f.debug_struct("Error")
             .field("kind", &self.kind)
             .field("context", &self.context.join("; "))
+            .field("location", &self.location.to_string())
             .field("source", &self.source)
             .finish()
     }
